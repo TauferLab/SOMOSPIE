@@ -551,7 +551,7 @@ def topo_widget(topos=topo_options):
     #topo_acc.children[0].children[0].children[0].value = True
     #for child in topo_acc.children[0].children:
     #    child.children[0].value = True
-    for i in range(0,len(topo_acc.children[0].children),2):
+    for i in range(0,len(topo_acc.children[0].children),3):
         topo_acc.children[0].children[i].children[0].value = True
     
     return topo_acc

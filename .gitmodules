@@ -1,0 +1,3 @@
+[submodule "code/ipywe"]
+	path = code/ipywe
+	url = https://github.com/scikit-beam/ipywe.git

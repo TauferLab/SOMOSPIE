@@ -1,0 +1,10 @@
+TerrestrialEcoregions_L2_Shapefile
+path*.txt
+NEONDomains_0
+*.stats
+*.keys
+*.sdat*
+*.prj*
+*.sgrd*
+*.mgrd*
+

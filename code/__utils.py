@@ -312,11 +312,15 @@ def source_widget(default_widget):
 def sm_fetch(year=2019, sm_source="ESA"):
     if sm_source=="ESA":
         if (1978 < year < 2018):
-            if not os.path.exists(f"{SUB_DATA}/ESA_CCI/{year}_ESA_monthly.rds"):
+            sm_file = f"{SUB_DATA}/ESA_CCI/{year}_ESA_monthly.rds"
+            if not os.path.exists(sm_file):
                 if not os.path.exists(f"{SUB_DATA}/ESA_CCI/{year}"):
                     bash([f"{SUB_DATA}/fetch_soil_moisture.sh", year])
                 bash([f"{SUB_CODE}/extract_SM_monthly.R", year, f"{SUB_DATA}/ESA_CCI"])
-            print(f"Monthly means generated for {year}.")
+            if os.path.exists(sm_file):
+                print(f"Monthly means generated for {year}.")
+            else:
+                print(f"Unknown error! Please delete {SUB_DATA}/ESA_CCI/{year} and try again.")
         else:
             print(f"Full-year ESA-CCI soil moisture data only available 1979 through 2017, not for {year} as requested.")
     else:

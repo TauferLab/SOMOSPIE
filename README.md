@@ -2,6 +2,9 @@
 
 ## SOMOSPIE (SOil MOisture SPatial Inference Engine)
 
+### Publication 
+D. Rorabaugh, M. Guevara, R. Llamas, J. Kitson, R. Vargas, and M. Taufer. SOMOSPIE: A Modular SOil MOisture SPatial Inference Engine based on Data Driven Decisions. . In Proceedings of the IEEE eScience Conference, pp. 1-10. San Diego, CA, USA. September 24-27, 2019.
+
 ### Introduction
 Soil moisture is a critical variable that links climate dynamics with water and food security. It regulates land-atmosphere interactions (e.g., via evapotranspiration--the loss of water from evaporation and plant transpiration to the atmosphere), and it is directly linked with plant productivity and survival. Information on soil moisture is important to design appropriate irrigation strategies to increase crop yield, and long-term soil moisture coupled with climate information provides insights into trends and potential agricultural thresholds and risks. Thus, information on soil moisture is a key factor to inform and enable precision agriculture.
 

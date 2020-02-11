@@ -6,7 +6,7 @@ The code is still under development. If you find any problems, please contact us
 D. Rorabaugh, M. Guevara, R. Llamas, J. Kitson, R. Vargas, and M. Taufer. SOMOSPIE: A Modular SOil MOisture SPatial Inference Engine based on Data Driven Decisions. In Proceedings of the IEEE eScience Conference, pp. 1-10. San Diego, CA, USA. September 24-27, 2019.
 
 # Requirement
-* Softwarr: Ananconda-py3, gis, Java 8, Jupyter Notebook, Python, R, Raster, Spark.
+* Software: Ananconda-py3, gis, Java 8, Jupyter Notebook, Python, R, Raster, Spark.
 * Platform: NSF XSEDE Jetstream, local machine.
 
 # Overview

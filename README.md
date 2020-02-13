@@ -1,5 +1,5 @@
 # SOMOSPIE (SOil MOisture SPatial Inference Engine)
- DOI: 10.5281/zenodo.3666731
+[![DOI](https://zenodo.org/badge/228438205.svg)](https://zenodo.org/badge/latestdoi/228438205)
 
 The code is still under development. If you find any problems, please contact us at taufer@utk.edu.
 

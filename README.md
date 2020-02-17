@@ -55,3 +55,6 @@ $ make jetstream
 
 You are now ready to start using SOMOSPIE! Launch Jupyter Notebooks with `ezj -q`, click the link provided, and open `SOMOSPIE.ipynb`.
 
+# Use SOMOSPIE with NSF XSEDE Jetstream
+
+If you have an account on the NSF XSEDE Jetstream cloud, you can use our public VM available https://use.jetstream-cloud.org/application/images/879.

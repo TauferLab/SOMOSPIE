@@ -148,8 +148,8 @@ for year in YEAR[:1]:
                 # Specify the input data folder and the output figures folder
                 DATS = PRED.joinpath(region)
                 OUTS = DATS.joinpath(SUB_FIGS)
-
-                visualize_input = [DATS, OUTS, 1, 0]
+                ORIGFOLDER = ORIG.joinpath(region)
+                visualize_input = [DATS, OUTS, ORIGFOLDER, 1, 0]
                 print(f"visualize(*{visualize_input})")
                 visualize(*visualize_input)
 

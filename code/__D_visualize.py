@@ -23,17 +23,16 @@ plt.switch_backend('agg')
 #        pl     boolean argument: 1 for plots, 0 for not
 #        hi     boolean argument: 1 for histograms, 0 for not
 
-def visualize(IN, OUT, ORIGEN, pl, hi):
+def visualize(IN, OUT, ORIGEN, reg_type, reg,  pl, hi):
     
     # Finding the intersection of the range of the different methods for each region
     # for the different models
-    
+    Region = f"{reg_type} {reg}"
     minimum = 0
     maximum = 1
 
     for in_file in (file for file in listdir(IN.joinpath(SUB_PRED)) if file.endswith(".csv")):
         model = pathlib.Path(in_file).stem
-        #print(model)
         
         in_dir = IN.joinpath(SUB_PRED)
         i = in_dir.joinpath(in_file)
@@ -52,7 +51,6 @@ def visualize(IN, OUT, ORIGEN, pl, hi):
     
     for in_file in (file for file in listdir(IN.joinpath(SUB_PRED)) if file.endswith(".csv")):
         model = pathlib.Path(in_file).stem
-        #print(model)
         
         #Plot predictions
         in_dir = IN.joinpath(SUB_PRED)
@@ -72,8 +70,8 @@ def visualize(IN, OUT, ORIGEN, pl, hi):
                 o = append_to_folder(out_file, "-plot.png")
                 oo = append_to_folder(out_file_origen, ".png")
                 log.write(f"Plotting {i} to {o}\n")
-                splot.soil_map(df, out=o, vmin=minimum, vmax=maximum)
-                splot.soil_map(df1, out=oo, vmin=minimum, vmax=maximum, size=20)
+                splot.soil_map(df, out=o, vmin=minimum, vmax=maximum, title=f"Prediction for {Region}. Model: {model}")
+                splot.soil_map(df1, out=oo, vmin=minimum, vmax=maximum, title=f"Observation Data for {Region}.", size=20)
             if hi:
                 o = append_to_folder(out_file, "-hist.png")
                 log.write(f"Histogramming {i} to {o}\n")

@@ -819,6 +819,8 @@ class outVis:
                     region = "_".join(line.strip().split(","))
                     #print(f"region: {region}")
                     method_paths[month][region] = {}
+                    image_origen = f"{region_paths[month][region]}/{SUB_FIGS}/{SUB_PRED}/origen.png"
+                    display(Image(filename=image_origen))
                     for method in a_dict[0]["MODICT"]:
                         #print(f"method: {method}")
                         paramdict = a_dict[0]["MODICT"][method]

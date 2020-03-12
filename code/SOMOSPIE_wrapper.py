@@ -136,7 +136,7 @@ for year in YEAR[:1]:
 
         for reg_type, reg in REG_LIST:
             region = f"{reg_type}_{reg}"
-
+            
             if VALIDATE:
                 R2_FILE = append_to_folder(JOB, ".r2")
                 RMSE_FILE = append_to_folder(JOB, ".rmse")
@@ -149,7 +149,7 @@ for year in YEAR[:1]:
                 DATS = PRED.joinpath(region)
                 OUTS = DATS.joinpath(SUB_FIGS)
                 ORIGFOLDER = ORIG.joinpath(region)
-                visualize_input = [DATS, OUTS, ORIGFOLDER, 1, 0]
+                visualize_input = [DATS, OUTS, ORIGFOLDER, reg_type, reg, 1, 0]
                 print(f"visualize(*{visualize_input})")
                 visualize(*visualize_input)
 

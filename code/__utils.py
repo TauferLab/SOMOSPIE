@@ -601,6 +601,12 @@ def region_widget(reg_type_acc):
     possible_regions = f"{SUB_DATA}/reg_list.csv"
     regs = pd.read_csv(possible_regions, skiprows=[1])
     
+    #Modified by Leo to eliminate the .0 from the widget
+    regs["CEC.lvl1"]=regs["CEC.lvl1"].fillna(-1)
+    regs["CEC.lvl1"] = regs["CEC.lvl1"].astype(int)
+    regs["CEC.lvl1"]= regs["CEC.lvl1"].astype(str)
+    regs["CEC.lvl1"] =  regs["CEC.lvl1"].replace('-1', '')
+    
     if "CEC" in region_types:
         region_types.pop(region_types.index("CEC"))
         region_types += ["CEC.lvl1", "CEC.lvl2", "CEC.lvl3"]
@@ -892,9 +898,9 @@ def parse_analysis(file):
                 
                 method = parts[4].split(".")[0]
                 
-                results.append([year, month, reg_type, reg, method, modifier, accuracy])
+                results.append([year, month, reg_type, reg, method, accuracy]) # Modified by Leo 03-17-2020
                 
-    results = pd.DataFrame(results, columns=["Year", "Month", "RegType", "Region", "Method", "Modifiers", metric])
+    results = pd.DataFrame(results, columns=["Year", "Month", "RegType", "Region", "Method", metric]) # Modified by Leo 03-17-2020
     #print(results.head())
     
     return results

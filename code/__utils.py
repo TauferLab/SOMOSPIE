@@ -764,7 +764,7 @@ class outVis:
                                             next=self.display_output, \
                                             start_dir=OUT, \
                                             type="directory")
-        return widgets.VBox([out_selector.panel])
+        return #widgets.VBox([out_selector.panel])
     
     def display_output(self, vis_target):
         from IPython.display import clear_output
@@ -840,7 +840,7 @@ class outVis:
                         for suffix in file_suffixes:
                             image_path = f"{region_paths[month][region]}/{SUB_FIGS}/{SUB_PRED}/{method}{suffix}-plot.png"
                             if os.path.exists(image_path):
-                                print(image_path)
+                                #print(image_path)
                                 display(Image(filename=image_path))
                                 with open(f"{region_paths[month][region]}/{SUB_PRED}/{method}{suffix}.log", 'r') as f:
                                     print("Method completion time:", f.readlines()[-1])

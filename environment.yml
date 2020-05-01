@@ -1,0 +1,12 @@
+channels:
+- conda-forge
+- defaults
+dependencies:
+- ipywe
+- pip
+- pip:
+  - pandas
+  - pyspark
+  - findspark
+  - sklearn
+  - matplotlib

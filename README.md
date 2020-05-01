@@ -58,3 +58,17 @@ You are now ready to start using SOMOSPIE! Launch Jupyter Notebooks with `ezj -q
 # Use SOMOSPIE with NSF XSEDE Jetstream
 
 If you have an account on the NSF XSEDE Jetstream cloud, you can use our public VM available [here](https://use.jetstream-cloud.org/application/images/946).
+
+
+# Use SOMOSPIE via Docker
+
+To build the image:
+```
+docker build -t <your-docker-user>/somospie:<optional-tag> .
+docker push <your-docker-user>/somospie:<optional-tag>
+```
+
+To run:
+```
+docker run --rm -it -P -name somospie  <your-docker-user>/somospie:<optional-tag>
+```

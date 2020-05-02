@@ -31,7 +31,7 @@ $ git clone --recursive https://github.com/TauferLab/SOMOSPIE
 
 Move into your new repository:
 
-$ cd Src_SOMOSPIE
+$ cd SOMOSPIE
 
 The `--recursive` tag above also downloaded any required submodules. If you left off that tag, you can use our makefile to do that now:
 

@@ -1,0 +1,230 @@
+<?xml version="1.0"?>
+<!DOCTYPE metadata SYSTEM "https://thor-f5.er.usgs.gov/ngtoc/metadata/fgdc-std-001-1998.dtd">
+<metadata>
+  <idinfo>
+    <citation>
+      <citeinfo>
+        <origin>U.S. Geological Survey</origin>
+        <pubdate>20190423</pubdate>
+        <title>USGS NED one meter x27y395 TN Eastern 2 16 B16 Del2 2016 IMG 2019</title>
+        <geoform>raster digital data</geoform>
+        <pubinfo>
+          <pubplace>Reston, VA</pubplace>
+          <publish>U.S. Geological Survey</publish>
+        </pubinfo>
+        <onlink>http://nationalmap.gov/elevation.html</onlink>
+        <onlink>http://nationalmap.gov/viewer.html</onlink>
+      </citeinfo>
+    </citation>
+    <descript>
+      <abstract>This is a tile of the standard one-meter resolution digital elevation model (DEM) produced through the 3D Elevation Program (3DEP) .  The elevations in this DEM represent the topographic bare-earth surface.  USGS standard one-meter DEMs are produced exclusively from high resolution light detection and ranging (lidar) source data of one-meter or higher resolution.  One-meter DEM surfaces are seamless within collection projects, but, not necessarily seamless across projects.  The spatial reference used for tiles of the one-meter DEM  within the conterminous United States (CONUS) is Universal Transverse Mercator (UTM) in units of meters, and in conformance with the North American Datum of 1983 (NAD83).  All bare earth elevation values are in meters and are referenced to the North American Vertical Datum of 1988 (NAVD88).  Each tile is distributed in the UTM Zone in which it lies.  If a tile crosses two UTM zones, it is delivered in both zones.  The one-meter DEM is the highest resolution standard DEM offered in the 3DEP product suite.  Other 3DEP products are nationally seamless DEMs in resolutions of 1/3, 1, and 2 arc seconds.  These seamless DEMs were referred to as the National Elevation Dataset (NED) from about 2000 through 2015 at which time they became the seamless DEM layers under the 3DEP program and lost the NED branding.  Other 3DEP products include five-meter DEMs in Alaska as well as various source datasets including the lidar point cloud and interferometric synthetic aperture radar (Ifsar) digital surface models and intensity images. All 3DEP products are public domain.</abstract>
+      <purpose>The 3DEP data serves as the elevation layer of The National Map, and provides basic elevation information for earth science studies and mapping applications in the United States. The data are utilized by the scientific and resource management communities for global change research, hydrologic modeling, resource monitoring, mapping and visualization, and many other applications.</purpose>
+      <supplinf>This is a 10,000 meter by 10,000 meter tile. The geographic area of coverage is described below in the Bounding Coordinates. Additional information for the 3DEP may be found on http://nationalmap.gov/elevation.html. Data may be downloaded through The National Map Viewer: http://nationalmap.gov/viewer.html. Direct links for direct access by automated services are provided in the Distribution section of this metadata.</supplinf>
+    </descript>
+    <timeperd>
+      <timeinfo>
+        <rngdates>
+          <begdate>20160205</begdate>
+          <enddate>20160404</enddate>
+        </rngdates>
+      </timeinfo>
+      <current>publication date</current>
+    </timeperd>
+    <status>
+      <progress>Complete</progress>
+      <update>As needed</update>
+    </status>
+    <spdom>
+      <bounding>
+        <westbc>-83.5410983544</westbc>
+        <eastbc>-83.4278473544</eastbc>
+        <northbc>35.6671532999</northbc>
+        <southbc>35.5792353797</southbc>
+      </bounding>
+    </spdom>
+    <keywords>
+      <theme>
+        <themekt>ISO 19115 Topic Category</themekt>
+        <themekey>elevation</themekey>
+        <themekey>10,000 meter DEM</themekey>
+        <themekey>1 meter DEM</themekey>
+      </theme>
+      <theme>
+        <themekt>NGDA Portfolio Themes</themekt>
+        <themekey>Elevation</themekey>
+      </theme>
+      <theme>
+        <themekt>3D Elevation Program (3DEP)</themekt>
+        <themekey>3D Elevation Program</themekey>
+        <themekey>3DEP</themekey>
+        <themekey>National Elevation Dataset</themekey>
+        <themekey>NED</themekey>
+        <themekey>Elevation</themekey>
+        <themekey>Light Detection and Ranging</themekey>
+        <themekey>LIDAR</themekey>
+        <themekey>High Resolution</themekey>
+        <themekey>Topographic Surface</themekey>
+        <themekey>Topography</themekey>
+        <themekey>Bare Earth</themekey>
+        <themekey>Hydro-Flattened</themekey>
+        <themekey>Terrain Elevation</themekey>
+        <themekey>Cartography</themekey>
+        <themekey>DEM</themekey>
+        <themekey>Digital Elevation Model</themekey>
+        <themekey>Digital Mapping</themekey>
+        <themekey>Digital Terrain Model</themekey>
+        <themekey>Geodata</themekey>
+        <themekey>GIS</themekey>
+        <themekey>Mapping</themekey>
+        <themekey>Raster</themekey>
+        <themekey>USGS</themekey>
+        <themekey>U.S. Geological Survey</themekey>
+        <themekey>10,000 meter DEM</themekey>
+        <themekey>1 meter DEM</themekey>
+      </theme>
+      <place>
+        <placekt>Geographic Names Information System</placekt>
+        <placekey>US</placekey>
+        <placekey>United States</placekey>
+      </place>
+    </keywords>
+    <accconst>None. Any downloading and use of these data signifies a user's agreement to comprehension and compliance of the USGS Standard Disclaimer. Insure all portions of metadata are read and clearly understood before using these data in order to protect both user and USGS interests.</accconst>
+    <useconst>There is no guarantee or warranty concerning the accuracy of the data. Users should be aware that temporal changes may have occurred since these data were collected and that some parts of these data may no longer represent actual surface conditions. Users should not use these data for critical applications without a full awareness of its limitations. Acknowledgement of the originating agencies would be appreciated in products derived from these data. Any user who modifies the data is obligated to describe the types of modifications they perform. User specifically agrees not to misrepresent the data, nor to imply that changes made were approved or endorsed by the USGS. Please refer to http://www.usgs.gov/privacy.html for the USGS disclaimer.</useconst>
+    <browse>
+      <browsen>https://prd-tnm.s3.amazonaws.com/StagedProducts/Elevation/1m/Projects/TN_Eastern_2_16_B16_Del2_2016/browse/USGS_NED_one_meter_x27y395_TN_Eastern_2_16_B16_Del2_2016_IMG_2019_thumb.jpg</browsen>
+      <browsed>Thumbnail JPG image</browsed>
+      <browset>JPEG</browset>
+    </browse>
+    <datacred>Acknowledgement of the originating agencies would be appreciated in products derived from these data.</datacred>
+  </idinfo>
+  <dataqual>
+    <logic>Please refer to the copy of the original product metadata file within the delivered folder if one was provided.</logic>
+    <complete>Data set is considered complete for the information presented, as described in the abstract. Users are advised to read the rest of the metadata record carefully for additional details.</complete>
+    <posacc>
+      <horizpa>
+        <horizpar>Please refer to the copy of the original product metadata file if one was provided.</horizpar>
+      </horizpa>
+      <vertacc>
+        <vertaccr>Please refer to the copy of the original product metadata file if one was provided.</vertaccr>
+      </vertacc>
+    </posacc>
+    <lineage>
+      <procstep>
+        <procdesc>Original project data were provided to the National Geospatial Technical Operations Center (NGTOC) in Rolla, MO and/or Denver, CO. The data were reviewed for quality and accuracy before publication.</procdesc>
+        <procdate>20190423</procdate>
+      </procstep>
+    </lineage>
+  </dataqual>
+  <spdoinfo>
+    <direct>Raster</direct>
+    <rastinfo>
+      <rasttype>Pixel</rasttype>
+      <rowcount>10013</rowcount>
+      <colcount>10012</colcount>
+      <vrtcount>1</vrtcount>
+    </rastinfo>
+  </spdoinfo>
+  <spref>
+    <horizsys>
+      <planar>
+        <gridsys>
+          <gridsysn>Transverse_Mercator</gridsysn>
+          <utm>
+            <utmzone>30</utmzone>
+            <transmer>
+              <sfctrmer>0.9996</sfctrmer>
+              <longcm>0.0</longcm>
+              <latprjo>0.0</latprjo>
+              <feast>500000.0</feast>
+              <fnorth>0.0</fnorth>
+            </transmer>
+          </utm>
+        </gridsys>
+        <planci>
+          <plance>coordinate pair</plance>
+          <coordrep>
+            <absres>1.0</absres>
+            <ordres>1.0</ordres>
+          </coordrep>
+          <plandu>N/A</plandu>
+        </planci>
+      </planar>
+    </horizsys>
+  </spref>
+  <eainfo>
+    <overview>
+      <eaover>The attribute summary can be found in the Data Dictionary (http://nationalmap.gov/3DEP/3dep_prodmetadata.html).</eaover>
+      <eadetcit>A link to the 3DEP Data Dictionary describing information that is included in the spatial metadata shapefiles acquired with the DEM is provided at the end of the Metadata Information section of this document.</eadetcit>
+    </overview>
+  </eainfo>
+  <distinfo>
+    <distrib>
+      <cntinfo>
+        <cntorgp>
+          <cntper>Unknown</cntper>
+          <cntorg>U.S. Geological Survey</cntorg>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>USGS National Geospatial Program Office</address>
+          <address>12201 Sunrise Valley Drive</address>
+          <city>Reston</city>
+          <state>VA</state>
+          <postal>20192</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>1-888-ASK-USGS (1-888-275-8747)</cntvoice>
+        <hours>Monday through Friday 8:00 AM to 4:00 PM Eastern Time Zone USA</hours>
+        <cntinst>Please visit http://www.usgs.gov/ask/ to contact us.</cntinst>
+      </cntinfo>
+    </distrib>
+    <resdesc>Downloadable Data</resdesc>
+    <distliab>Although these data have been processed successfully on a computer system at the U.S. Geological Survey, no warranty, expressed or implied, is made by either regarding the utility of the data on any system, nor shall the act of distribution constitute any such warranty. The USGS will warranty the delivery of this product in computer-readable format and will offer appropriate adjustment of credit when the product is determined unreadable by correctly adjusted computer peripherals, or when the physical medium is delivered in damaged condition. Requests for adjustments of credit must be made within 90 days from the date of this shipment from the ordering site.</distliab>
+    <stdorder>
+      <digform>
+        <digtinfo>
+          <formname>IMG</formname>
+        </digtinfo>
+        <digtopt>
+          <onlinopt>
+            <computer>
+              <networka>
+                <networkr>ftp://rockyftp.cr.usgs.gov/vdelivery/Datasets/Staged/Elevation/1m/Projects/TN_Eastern_2_16_B16_Del2_2016/IMG/USGS_NED_one_meter_x27y395_TN_Eastern_2_16_B16_Del2_2016_IMG_2019.zip</networkr>
+              </networka>
+            </computer>
+          </onlinopt>
+        </digtopt>
+      </digform>
+      <fees>None. No fees are applicable for obtaining the data set.</fees>
+    </stdorder>
+  </distinfo>
+  <metainfo>
+    <metd>20190423</metd>
+    <metc>
+      <cntinfo>
+        <cntorgp>
+          <cntper>Unknown</cntper>
+          <cntorg>U.S. Geological Survey</cntorg>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>mailing and physical</addrtype>
+          <address>USGS National Geospatial Program Office</address>
+          <address>12201 Sunrise Valley Drive</address>
+          <city>Reston</city>
+          <state>VA</state>
+          <postal>20192</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>1-888-ASK-USGS (1-888-275-8747)</cntvoice>
+        <hours>Monday through Friday 8:00 AM to 4:00 PM Eastern Time Zone USA</hours>
+        <cntinst>Please visit http://www.usgs.gov/ask/ to contact us.</cntinst>
+      </cntinfo>
+    </metc>
+    <metstdn>FGDC Content Standard for Digital Geospatial Metadata</metstdn>
+    <metstdv>FGDC-STD-001-1998</metstdv>
+    <metextns>
+      <onlink>http://nationalmap.gov/3DEP/3dep_prodmetadata.html</onlink>
+      <metprof>3D Elevation Program (3DEP) Metadata</metprof>
+    </metextns>
+  </metainfo>
+</metadata>

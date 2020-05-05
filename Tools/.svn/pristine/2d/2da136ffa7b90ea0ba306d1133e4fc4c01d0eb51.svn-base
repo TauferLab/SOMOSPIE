@@ -1,0 +1,201 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<metadata>
+  <idinfo>
+    <citation>
+      <citeinfo>
+        <origin>Woolpert</origin>
+        <pubdate>20170228</pubdate>
+        <title>East Tennessee FY16 Lidar Hydro Flattened Bare Earth DEM</title>
+        <geoform>raster digital data</geoform>
+      </citeinfo>
+    </citation>
+    <descript>
+      <abstract>Product: These are Digital Elevation Model (DEM) data for East Tennessee FY16 Lidar Project Level as part of the required deliverables for East Tennessee FY16 Lidar project. Class 2 (ground) lidar points in conjunction with the hydro breaklines and bridge breaklines were used to create a 2.5 feet hydro-flattened Raster DEM. Geographic Extent: This task order requires lidar data to be acquired over 7,863 square miles miles in eastern Tennessee including Davidson, Macon, Monroe, Loudon, Blount, Sevier, Knox, Union, Jefferson, Cocke, Grainger, Hamblen, Greene, Hawkins, Sullivan, Washington, Carter, and Unicoi counties. Dataset Description: East_Tennessee FY16 Lidar project called for the Planning, Acquisition, processing and derivative products of lidar data to be collected at a nominal pulse spacing (NPS) of 0.7meter. Project specifications are based on the U.S. Geological Survey National Geospatial Program Base Lidar Specification, Version 1.2. The data was developed based on a horizontal projection/datum of Tennessee State Plane Zone  NAD83(2011) US Survey Feet, Survey Feet and vertical datum of NAVD88 Geoid12B Survey Feet. Lidar data was delivered as flightline-extent unclassified LAS swaths, as processed Classified LAS 1.4 files, formatted to 7646 individual 7000 ft x 4000 ft tiles in Tennessee State Plane Zone  NAD83(2011) US Survey Feet, Survey Feet and vertical datum of NAVD88 Geoid12B Survey Feet, as tiled Intensity Imagery, and as tiled bare earth DEMs; all tiled to the same 7000 ft x 4000 ft schema. Ground Conditions: Lidar was collected in spring of 2016 by Woolpert, while no snow was on the ground and rivers were at or below normal levels. In order to post process the lidar data to meet task order specifications and meet ASPRS vertical accuracy guidelines, Woolpert established 177  ground control points that were used to calibrate the lidar to known ground locations established throughout the project area. Additional independent accuracy checkpoints were collected (230 NVA points and 172VVA points) and used to assess the vertical accuracy of the data. These checkpoints were not used to calibrate or post process the data. 
+Five delivery tiles in Area 2 do not have full coverage. The total area of missing data total approximately 0.41 square miles. These tiles exist on the internal boundary with Blount County and are: 2598493SW, 2598493SE, 2612493SW, 2570477SE, 2556461SE. The East Tennessee FY16 Lidar project shares a border with the TN 27 County (Cumberland Plateau) 0.7m NPS  Lidar task order.  A small amount of TN 27 County data was used to fill out coverage in the East Tennessee project.  91 tiles contains TN 27 County data.  Raw swath data is not being delivered for the TN27 County data as only a small portion of the swath was used to fill out coverage.
+</abstract>
+      <purpose>Data is used for: Terrain analysis, drainage studies, planning and development</purpose>
+      <supplinf>Raster File Type = IMG Bit Depth/Pixel Type =32-bit float Raster Cell Size = 2.5 Sv Feet Interpolation or Resampling Technique = Triangulated Irregular Network Required Vertical Accuracy = NVA</supplinf>
+    </descript>
+    <timeperd>
+      <timeinfo>
+        <rngdates>
+          <begdate>20160205</begdate>
+          <enddate>20160404</enddate>
+        </rngdates>
+      </timeinfo>
+      <current>ground condition</current>
+    </timeperd>
+    <status>
+      <progress>Complete</progress>
+      <update>None planned</update>
+    </status>
+    <spdom>
+      <bounding>
+        <westbc>-87.122059</westbc>
+        <eastbc>-81.633790</eastbc>
+        <northbc>36.699618</northbc>
+        <southbc>35.117189</southbc>
+      </bounding>
+    </spdom>
+    <keywords>
+      <theme>
+        <themekt>None</themekt>
+        <themekey>Model</themekey>
+        <themekey>Raster</themekey>
+        <themekey>DEM</themekey>
+        <themekey>Remote sensing</themekey>
+        <themekey>Elevation Data</themekey>
+        <themekey>Lidar</themekey>
+      </theme>
+      <place>
+        <placekt>None</placekt>
+        <placekey>United States</placekey>
+        <placekey>Tennessee </placekey>
+      </place>
+    </keywords>
+    <accconst>No restrictions apply to this data.</accconst>
+    <useconst>None. However, users should be aware that temporal changes may have occurred since this dataset was collected and that some parts of these data may no longer represent actual surface conditions. Users should not use these data for critical applications without a full awareness of its limitations. Acknowledgement of the U.S. Geological Survey would be appreciated for products derived from these data.</useconst>
+  </idinfo>
+  <dataqual>
+    <logic>Data covers the entire area specified for this project.</logic>
+    <complete>Datasets contain complete coverage of tiles. No points have been removed or excluded. A visual qualitative assessment was performed to ensure data completeness. There are no void areas or missing data. The raw point cloud is of good quality and data passes Non-Vegetated Vertical Accuracy specifications.</complete>
+    <posacc>
+      <vertacc>
+        <vertaccr>LAS data covering the Eastern Tennessee FY16 Lidar Task Order was compared to independent survey control points to determine the NVA of the LAS Swath and of the Bare-Earth DEM. In addition, this LAS data was compared to independent VVA points. LAS Swath Non-Vegetated Vertical Accuracy (NVA) Tested 0.094 Meter Non vegetated vertical accuracy at a 95 percent confidence level, derived according to NSSDA, in open terrain using 0.048 Meter (RMSEz) x 1.96000 as defined by the National Standards for Spatial Data Accuracy (NSSDA); assessed and reported using National Digital Elevation Program (NDEP)/ASPRS Guidelines. Bare-Earth DEM Non-Vegetated Vertical Accuracy (NVA) Tested 0.096 Meter Non vegetated vertical accuracy at a 95 percent confidence level, derived according to NSSDA, in open terrain using 0.049 Meter (RMSEz) x 1.96000 as defined by the National Standards for Spatial Data Accuracy (NSSDA); assessed and reported using National Digital Elevation Program (NDEP)/ASPRS Guidelines.</vertaccr>
+        <qvertpa>
+          <vertaccv>0.120 Meter</vertaccv>
+          <vertacce>Raw Swath Non-Vegetated Vertical Accuracy (NVA) Tested 0.120 Meter Non vegetated vertical accuracy at a 95 percent confidence level, derived according to NSSDA, in open terrain using (RMSEz)  x 1.96000 as defined by the National Standards for Spatial Data Accuracy (NSSDA); assessed and reported using National Digital Elevation Program (NDEP)/ASPRS Guidelines and tested against the TIN using allall lidar points.  Accuracy was tested against 230 NVA points.</vertacce>
+        </qvertpa>
+        <qvertpa>
+          <vertaccv>0.096 Meter</vertaccv>
+          <vertacce>Bare-Earth DEM Non-Vegetated Vertical Accuracy (NVA) Tested 0.096 Meter Non-Vegetated vertical accuracy at a 95 percent confidence level, derived according to NSSDA, in open terrain using (RMSEz) x 1.96000 as defined by the National Standards for Spatial Data Accuracy (NSSDA); assessed and reported using National Digital Elevation Program (NDEP)/ASPRS Guidelines and tested against the DEM. Accuracy was tested against 230 NVA points.</vertacce>
+        </qvertpa>
+        <qvertpa>
+          <vertaccv>0.169 Meter</vertaccv>
+          <vertacce>Vegetated Vertical Accuracy (VVA) Tested 0.169 Meter at the 95th percentile reported using National Digital Elevation Program (NDEP)/ASPRS Guidelines and tested against the DEM. Accuracy was tested against 172 VVA points. VVA Errors larger than 95th percentile include:
+Point 3002, Easting 2014876.550, Northing 827029.260, Z-Error 0.230 Meter
+Point 3004, Easting 1899371.410, Northing 807367.340, Z-Error 0.178 Meter
+Point 3019, Easting 1655450.170, Northing 610320.220, Z-Error 0.281 Meter
+Point 3034, Easting 1821339.850, Northing 647044.230, Z-Error 1.102 Meter
+Point 3055, Easting 1670316.580, Northing 605783.060, Z-Error 0.180 Meter
+Point 3084, Easting 2668594.810, Northing 556470.540, Z-Error 0.181 Meter
+Point 3113, Easting 2793602.840, Northing 636839.390, Z-Error 0.309 Meter
+Point 3120, Easting 2584756.690, Northing 666424.980, Z-Error 0.208 Meter
+</vertacce>
+        </qvertpa>
+      </vertacc>
+    </posacc>
+    <lineage>
+      <procstep>
+        <procdesc>Hydro Flattened Raster DEM Process: Class 2 (ground) lidar points in conjunction with the hydro breaklines as well bridge breaklines were used to create a 2.5 ft hydro-flattened Raster DEM. Using automated scripting routines within ArcMap, an ERDAS Imagine IMG file was created for each tile. Each surface is reviewed using Global Mapper to check for any surface anomalies or incorrect elevations found within the surface.</procdesc>
+        <procdate>20160205</procdate>
+      </procstep>
+    </lineage>
+  </dataqual>
+  <spdoinfo>
+    <direct>Raster</direct>
+    <rastinfo>
+      <rasttype>Pixel</rasttype>
+      <rowcount>1600</rowcount>
+      <colcount>2800</colcount>
+    </rastinfo>
+  </spdoinfo>
+  <spref>
+    <horizsys>
+      <planar>
+        <mapproj>
+          <mapprojn>NAD 1983 2011 StatePlane Tennessee FIPS 4100 Ft US</mapprojn>
+          <lambertc>
+            <stdparll>35.25</stdparll>
+            <stdparll>36.41666666666666</stdparll>
+            <longcm>-86</longcm>
+            <latprjo>34.33333333333334</latprjo>
+            <feast>1968500.0</feast>
+            <fnorth>0.0</fnorth>
+          </lambertc>
+        </mapproj>
+        <planci>
+          <plance>row and column</plance>
+          <coordrep>
+            <absres>2.5</absres>
+            <ordres>2.5</ordres>
+          </coordrep>
+          <plandu>Ft US</plandu>
+        </planci>
+      </planar>
+      <geodetic>
+        <horizdn>D NAD 1983 2011</horizdn>
+        <ellips>GRS 1980</ellips>
+        <semiaxis>6378137.0</semiaxis>
+        <denflat>298.257222101</denflat>
+      </geodetic>
+    </horizsys>
+    <vertdef>
+      <altsys>
+        <altdatum>North American Vertical Datum of 1988(GEOID12B)</altdatum>
+        <altres>0.01</altres>
+        <altunits>Ft US</altunits>
+        <altenc>Explicit elevation coordinate included with horizontal coordinates</altenc>
+      </altsys>
+    </vertdef>
+  </spref>
+  <distinfo>
+    <distrib>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>USGS/NGTOC</cntorg>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>mailing and physical address</addrtype>
+          <address>1400 Independence Rd.</address>
+          <city>Rolla</city>
+          <state>MO</state>
+          <postal>65401</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>(573) 308-3587</cntvoice>
+        <cntfax>Unknown</cntfax>
+        <hours>Unknown</hours>
+      </cntinfo>
+    </distrib>
+    <resdesc>Downloadable Data</resdesc>
+    <distliab>Woolpert prepared the original data as set forth in the Scope of Services, in accordance with reasonable care and due diligence as set forth in this Agreement, however, due to the easily alterable nature of electronic media, files, documents, and other deliverables, Woolpert, Inc. makes no warranties, either expressed or implied, with respect to the accuracy, completeness, merchantability, or fitness for any particular purpose, including, but not limited to, use of any/all data as described within this metadata file, by any user of this data. Any use will be at the end-user’s sole risk.</distliab>
+    <availabl>
+      <timeinfo>
+        <sngdate>
+          <caldate>unknown</caldate>
+          <time>unknown</time>
+        </sngdate>
+      </timeinfo>
+    </availabl>
+  </distinfo>
+  <metainfo>
+    <metd>20170228</metd>
+    <metc>
+      <cntinfo>
+        <cntorgp>
+          <cntorg>Woolpert</cntorg>
+        </cntorgp>
+        <cntaddr>
+          <addrtype>mailing and physical address</addrtype>
+          <address>4454 Idea Center Blvd.</address>
+          <city>Dayton</city>
+          <state>OH</state>
+          <postal>45430</postal>
+          <country>USA</country>
+        </cntaddr>
+        <cntvoice>(937) 461-5660</cntvoice>
+        <cntfax>(937) 461-0743 </cntfax>
+        <hours>8:00 a.m. to 5:00 p.m. Eastern Time</hours>
+      </cntinfo>
+    </metc>
+    <metstdn>FGDC Content Standards for Digital Geospatial Metadata</metstdn>
+    <metstdv>FGDC-STD-001-1998</metstdv>
+    <mettc>local time</mettc>
+    <metsi>
+      <metscs>Unclassified</metscs>
+      <metsc>Unclassified</metsc>
+      <metshd>Unclassified</metshd>
+    </metsi>
+  </metainfo>
+</metadata>

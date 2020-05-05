@@ -1,7 +1,7 @@
 #!/bin/bash
 
 year=$1
-version=4.5
+version=4.7
 sm_dir=data/ESA_CCI
 
 mkdir -p ${sm_dir}/${year}

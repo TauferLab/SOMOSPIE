@@ -311,7 +311,7 @@ def source_widget(default_widget):
 #  and rewritten so that each year is completed in an independent shell (tmux?) so as not to hold up the process.
 def sm_fetch(year=2019, sm_source="ESA"):
     if sm_source=="ESA":
-        if (1978 < year < 2018):
+        if (1978 < year < 2020):
             sm_file = f"{SUB_DATA}/ESA_CCI/{year}_ESA_monthly.rds"
             if not os.path.exists(sm_file):
                 if not os.path.exists(f"{SUB_DATA}/ESA_CCI/{year}"):
@@ -322,7 +322,7 @@ def sm_fetch(year=2019, sm_source="ESA"):
             else:
                 print(f"Unknown error! Please delete {SUB_DATA}/ESA_CCI/{year} and try again.")
         else:
-            print(f"Full-year ESA-CCI soil moisture data only available 1979 through 2017, not for {year} as requested.")
+            print(f"Full-year ESA-CCI soil moisture data only available 1979 through 2019, not for {year} as requested.")
     else:
         print(f"Soil moisture source {sm_source} not recognized.")
 
@@ -334,7 +334,7 @@ def sm_source_widget():
 
 # Widgets to select the start year and the end year.
 def sm_widget(source="ESA"):
-    year_range = {"ESA": [1979, 2017]}
+    year_range = {"ESA": [1979, 2019]}
     
     earliest_year, latest_year = year_range[source]
     list_of_years = [str(year) for year in range(earliest_year, latest_year + 1)]

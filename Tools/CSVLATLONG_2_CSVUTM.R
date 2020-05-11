@@ -7,14 +7,13 @@
 
 library(raster)
 
+
 args = commandArgs(trailingOnly=TRUE) # read the input *csv file and the output *.tif
 temp <- read.csv(args[1])
-cord.dec = SpatialPoints(cbind(temp$x, temp$y), proj4string=CRS("+proj=longlat"))
-z <- data.frame(cord.dec,temp[,3:ncol(temp)])
-b <- rasterFromXYZ(z)
-projection(b) <- "+proj=longlat +datum=WGS84 +ellps=WGS84 +towgs84=0,0,0"
-b <- projectRaster(b, crs="+proj=utm +zone=17 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")
-temp <- as(b, 'SpatialPixelsDataFrame') 
-temp <- data.frame(temp@coords, temp@data)
-names(temp) <- c('x', 'y', 'Moisture', 'Elevation')
-write.csv(temp, file = args[2],row.names = FALSE)
+xy <-data.frame(temp)
+coordinates(xy) <- c("x", "y")
+proj4string(xy) <- CRS("+proj=longlat +datum=WGS84")
+xy <- spTransform(xy, CRS="+proj=utm +zone=17 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs")
+xy <- data.frame(xy@coords, xy@data)
+write.csv(xy, file = args[2],row.names = FALSE)
+

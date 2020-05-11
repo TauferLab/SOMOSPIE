@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 import math
 import matplotlib.pyplot as plt
+import time
 
 def bash(argv):
     arg_seq = [str(arg) for arg in argv]

@@ -10,6 +10,11 @@ import pandas as pd
 import math
 import matplotlib.pyplot as plt
 import time
+import glob
+from matplotlib.colors import ListedColormap
+cmap_brg = plt.cm.get_cmap('brg', 256)
+clist_rg = cmap_brg(np.linspace(0.5, 1, 128))
+cmap_rg = ListedColormap(clist_rg)
 
 def bash(argv):
     arg_seq = [str(arg) for arg in argv]
@@ -99,5 +104,26 @@ def changing_to_utm(Input_file, Output_file):
     command = ['./CSVLATLONG_2_CSVUTM.R', Input_file, Output_file]
     bash(command)
     
+######################################################################################################################
+def soil_map(df, title="Soil Moisture Heatmap", out="", cmap=cmap_rg, legend="Soil Moisture", size=.05, vmin=None, vmax=None, value=2):
+    
+    if df.shape[1]<3:
+        raise ValueError("The dataframe doesn't have enough columns.")
+    elif df.shape[1]>3:
+        #print("The dataframe has too many columns, so we're dropping all but the first three.")
+        df = df[df.columns[:3]]
+    df.columns=["Longitude", "Latitude", legend]
+    heatmap(df, title=title, out=out, cmap=cmap, size=size, vmin=vmin, vmax=vmax, value=value)
+    
 
+# General heatmap function. 
+def heatmap(df, horizontal=0, vertical=1, value=2, vmin=None, vmax=None, size=1, title="Heatmap", out="", cmap=None):
+    df.plot.scatter(x=horizontal, y=vertical, s=size, c=value, cmap=cmap, title=title, vmin=vmin, vmax=vmax)
+    if out:
+        print(f"Saving image to {out}")
+        plt.savefig(out)
+        plt.show()
+    else:
+        plt.show()
+    plt.close()
 

@@ -10,7 +10,7 @@ jetstream:
 	@echo "Installing all necessary software for SOMOSPIE on your Jetstream vm." | tee -a $(log)
 	@echo "This assumes you have run ezj at some point and conda is currently activated or in your path." | tee -a $(log)
 	@echo "This may take an hour." | tee -a $(log)
-	cd install; . install.sh
+	cd install; ./install.sh
     
 tellico:
 	@echo "## make tellico ##" | tee -a $(log)

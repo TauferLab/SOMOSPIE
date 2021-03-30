@@ -16,6 +16,11 @@ cmap_brg = plt.cm.get_cmap('brg', 256)
 clist_rg = cmap_brg(np.linspace(0.5, 1, 128))
 cmap_rg = ListedColormap(clist_rg)
 
+###################################################################################################################
+
+
+
+
 def bash(argv):
     arg_seq = [str(arg) for arg in argv]
     #print(arg_seq)
@@ -25,10 +30,10 @@ def bash(argv):
 ################################################################################################################
 # Models Available
 
-Models = {'KKNN' : '/home/lvalera/Src_SOMOSPIE/code/2b-kknn.R',
-          'SBM'   : '/home/lvalera/Src_SOMOSPIE/code/hypppo7.py',
-          'HYPPO' : '/home/lvalera/Src_SOMOSPIE/code/hypppo7.py',
-          'RF'    : '/home/lvalera/Src_SOMOSPIE/code/2c-rf.R'
+Models = {'KKNN' : f'../code/2b-kknn.R',
+          'SBM'   :f'../code/hypppo7.py',
+          'HYPPO' :f'../code/hypppo7.py',
+          'RF'    :f'../code/2c-rf.R'
 }
 
 ##################################################################################################################    

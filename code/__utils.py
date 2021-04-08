@@ -341,13 +341,13 @@ def sm_widget(source="ESA"):
 
     wStart_year = widgets.Dropdown(
         options=list_of_years,
-        value=str(latest_year),
+        value=str(latest_year-2),
         description='Start year:'
     )
 
     wEnd_year = widgets.Dropdown(
         options=list_of_years,
-        value=str(latest_year),
+        value=str(latest_year-2),
         description='End year:'
     )
 

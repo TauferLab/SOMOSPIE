@@ -5,9 +5,9 @@
 [ -d "data" ] && cd data
 
 ECO=TerrestrialEcoregions_L2_Shapefile
-wget http://www.cec.org/sites/default/files/Atlas/Files/Terrestrial_Ecoregions_L2/$ECO.zip
-unzip -o $ECO.zip
-rm -r $ECO.zip
+wget http://www.cec.org/wp-content/uploads/wpallimport/files/Atlas/Files/Terrestrial_Ecoregions_L2/TerrestrialEcoregions_L2_Shapefile.zip
+unzip -o TerrestrialEcoregions_L2_Shapefile.zip
+rm -r TerrestrialEcoregions_L2_Shapefile.zip
 echo $(date) > $ECO/downloaded.txt
 find $ECO/ -name "terrestrial_Ecoregions_updated.shp" -exec echo {} > path_CEC.txt \;
 # The following two lines were used once to update .gitignore, which was updated in the repo,

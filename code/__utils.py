@@ -309,7 +309,7 @@ def source_widget(default_widget):
 
 # ToDo: This function needs to be moved out to it's own script 
 #  and rewritten so that each year is completed in an independent shell (tmux?) so as not to hold up the process.
-def sm_fetch(year=2019, sm_source="ESA"):
+def sm_fetch(year=2017, sm_source="ESA"):
     if sm_source=="ESA":
         if (1978 < year < 2020):
             sm_file = f"{SUB_DATA}/ESA_CCI/{year}_ESA_monthly.rds"

@@ -23,38 +23,44 @@ region <- args[2]
 out_path <- args[3]
 
 if (type == "CEC") {
-  eco_loc <- "../data/TerrestrialEcoregions_L2_Shapefile/NA_Terrestrial_Ecoregions_Level_II/data/terrestrial_Ecoregions_updated/terrestrial_Ecoregions_updated.
-shp"
+  eco_loc1 <- "../data/NA_Terrestrial_Ecoregions_Level_I_Shapefile/data/NA_Terrestrial_Ecoregions_v2_level1.shp"
+  eco_loc2 <- "../data/NA_Terrestrial_Ecoregions_Level_II_Shapefile/data/NA_Terrestrial_Ecoregions_v2_level2.shp"
+  eco_loc3 <- "../data/NA_Terrestrial_Ecoregions_v2_Level_III_Shapefile/data/NA_Terrestrial_Ecoregions_v2_level3.shp"
+
+#"../data/TerrestrialEcoregions_L2_Shapefile/NA_Terrestrial_Ecoregions_Level_II/data/terrestrial_Ecoregions_updated/terrestrial_Ecoregions_updated.
+#shp"
   
   # Procure specified ecoregion.
-  ECOsh <- shapefile(eco_loc)
+  ECOsh1 <- shapefile(eco_loc1)
+  ECOsh2 <- shapefile(eco_loc2)
+  ECOsh3 <- shapefile(eco_loc3)
   print("CEC ecoregion shapefile loaded.")
   # The following counts the number of periods in the command-line argument.
   # This is one less than the level; for example LEVEL3 10.2.4 has 2 periods.
   num_periods <- (nchar(region) - nchar(gsub("\\.", "", region)))
   print(paste0("Ready to cut to level ", num_periods + 1, " region ", region, "."))
   if (num_periods == 0) {
-    regs <- unique(ECOsh$LEVEL1)
+    regs <- unique(ECOsh1$LEVEL1)
     if (region %in% regs) {
-        reg <- ECOsh[ECOsh$LEVEL1 == region, ]
+        reg <- ECOsh1[ECOsh1$LEVEL1 == region, ]
     } else {
         print("Unrecognized CEC level 1 ecoregion. Options are:")
         print(regs)
         quit()
     }
   } else if (num_periods == 1) {
-    regs <- unique(ECOsh$LEVEL2)
+    regs <- unique(ECOsh2$LEVEL2)
     if (region %in% regs) {
-        reg <- ECOsh[ECOsh$LEVEL2 == region, ]
+        reg <- ECOsh2[ECOsh2$LEVEL2 == region, ]
     } else {
         print("Unrecognized CEC level 2 ecoregion. Options are:")
         print(regs)
         quit()
     }
   } else if (num_periods == 2) {
-    regs <- unique(ECOsh$LEVEL3)
+    regs <- unique(ECOsh3$LEVEL3)
     if (region %in% regs) {
-        reg <- ECOsh[ECOsh$LEVEL3 == region, ]
+        reg <- ECOsh3[ECOsh3$LEVEL3 == region, ]
     } else {
         print("Unrecognized CEC level 3 ecoregion. Options are:")
         print(regs)

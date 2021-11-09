@@ -13,10 +13,10 @@ COPY . /home/jovyan/work
 
 USER root
 RUN chown -R jovyan:users /home/jovyan/work 
-RUN Rscript /home/jovyan/work/install.R
+RUN Rscript /home/jovyan/work/install/install_docker.R
 RUN conda env update --name base -f /home/jovyan/work/environment.yml 
 
 USER $NB_USER
 RUN cd /home/jovyan/work && \ 
     git submodule update --init --recursive && \ 
-    touch code/ipywe/__init__.py
+    touch SOMOSPIE/modules/ipywe/ipywe/__init__.py

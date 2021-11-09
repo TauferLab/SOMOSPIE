@@ -1,0 +1,3 @@
+#!/bin/sh
+
+ saga_cmd ta_compound 0 -ELEVATION $1.sgrd -SHADE $1_shade.sgrd -SLOPE $1_slope.sgrd -ASPECT $1_aspect.sgrd -HCURV $1_hcurv.sgrd -VCURV $1_vcurv.sgrd -CONVERGENCE $1_convergence.sgrd -SINKS $1_closed_depresion.sgrd -FLOW $1_total_catch_area.sgrd -WETNESS $1_twi.sgrd -LSFACTOR $1_lsfactor.sgrd  -CHNL_BASE $1_chanel_base.sgrd -VALL_DEPTH $1_vlley_depth.sgrd -RSP $1_relative_slope_position.sgrd

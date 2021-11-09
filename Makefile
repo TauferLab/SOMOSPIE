@@ -35,7 +35,7 @@ submodules:
 	@echo "## make submodules ##" | tee -a $(log)
 	@echo "Loading and updating all git submodules for Src_SOMOSPIE" | tee -a $(log)
 	git submodule update --init --recursive
-	touch code/ipywe/__init__.py
+	touch SOMOSPIE/modules/ipywe/ipywe/__init__.py
 
 list:
 	@$(MAKE) -pRrq -f $(lastword $(MAKEFILE_LIST)) : 2>/dev/null | awk -v RS= -F: '/^# File/,/^# Finished Make data base/ {if ($$1 !~ "^[#.]") {print $$1}}' | sort | egrep -v -e '^[^[:alnum:]]' -e '^$@$$'

@@ -1,0 +1,38 @@
+{% set version = "0.1.3a1" %}
+{% set git_rev = "0.1.3a1" %}
+
+package:
+  name: ipywe
+  version: {{ version }}
+
+source:
+  git_rev: {{ git_rev }}
+  git_url: https://github.com/neutrons/ipywe.git
+
+build:
+  number: 0
+  script: python setup.py install --single-version-externally-managed --record record.txt
+#  noarch: python
+
+requirements:
+  build:
+    - python {{ python }} 
+    - setuptools
+    - jupyter
+  run:
+    - python {{ python }} 
+    - ipywidgets >=6.0.0
+    - traitlets >=4.3.0
+    - pillow
+    - numpy
+    - scipy
+    
+test:
+  imports:
+    - ipywe
+
+about:
+  home: https://github.com/neutrons/ipywe
+  license: BSD 3-Clause
+  summary: ipywidgets extensions for neutron scattering data analysis
+

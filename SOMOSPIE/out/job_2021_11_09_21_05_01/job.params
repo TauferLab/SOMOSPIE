@@ -1,0 +1,4 @@
+{'START': '"../"', 'CODE': '"../code/"', 'DATA': '"../data/"', 'OUTPUT': '"../out/"', 'COV_FILE': '"../data/topo_predictors/stack.tif"', 'SM_FILE': '"../data//ESA_CCI/2017_ESA_monthly.rds"', 'EVAL_FILE': '""', 'MAKE_T_E': 1, 'USE_PCA': 0, 'RAND_SEED': 0, 'USE_VIS': 1, 'BUFFER': 0, 'SUPER': 0, 'MIN_T_POINTS': 11, 'VALIDATE': 1.3, 'REG_LIST': [('STATE', 'Alabama')], 'MONTHS': [1], 'MODICT': {'RF': {}}, 'YEAR': [2017], 'COV_LAYERS': ['CONUS_DEM1km'], 'TRAIN_DIR': '"2017/t"', 'EVAL_DIR': '"2017/e"'}
+{1: {'seed': 44079}}
+1636491941.4017534
+56.654794692993164

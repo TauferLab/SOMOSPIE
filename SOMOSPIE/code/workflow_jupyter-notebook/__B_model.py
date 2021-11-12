@@ -38,8 +38,8 @@ from time import time
 def model(REGION, TRAIN_DIR, EVAL_DIR, OUT_DIR, MODELS, NOTE):
 
     TRAVIS_MODEL = pathlib.Path("ml_models/hypppo7.py").resolve()
-    MARIO_MODEL = pathlib.Path("ml_models/2b-kknn.R").resolve()
-    RF_MODEL = pathlib.Path("ml_models/2c-rf.R").resolve()
+    MARIO_MODEL = pathlib.Path("ml_models/2b-kknn.py").resolve()
+    RF_MODEL = pathlib.Path("ml_models/2c-rf.py").resolve()
     
     # If 0 is given instead of a specified region, 
     # create list of all regions in the TRAIN_DIR

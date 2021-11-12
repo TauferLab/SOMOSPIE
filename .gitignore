@@ -27,6 +27,8 @@
 *.xml
 *.shx
 *.img
+*.sdat
+*.sgrd
 __pycache__
 SOMOSPIE/out/*
 

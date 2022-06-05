@@ -11,12 +11,12 @@ else:
 
 import pathlib
 from os import listdir, chdir 
-from __utils import *
+from utils import *
 
-from __A_curate import curate
-from __B_model import model
-from __C_analyze import analysis
-from __D_visualize import visualize
+from curate import curate
+from model import model
+from analyze import analysis
+from visualize import visualize
 
 import configparser
 from ast import literal_eval

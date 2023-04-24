@@ -1,3 +1,4 @@
+*.DS_Store
 *.pdf
 *.doc
 *.docx
@@ -31,4 +32,5 @@
 *.sgrd
 __pycache__
 SOMOSPIE/out/*
+SOMOSPIE/data/*
 

@@ -9,8 +9,9 @@
 
 # Add CRAN repository for more up-to-date r and r packages
 # https://vitux.com/how-to-install-and-use-the-r-programming-language-in-ubuntu-18-04-lts/
-sudo apt-key adv --keyserver keyserver.ubuntu.com --recv-keys E298A3A825C0D65DFD57CBB651716619E084DAB9
-sudo add-apt-repository 'deb https://cloud.r-project.org/bin/linux/ubuntu focal-cran40/'
+sudo apt install --no-install-recommends software-properties-common dirmngr
+wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | sudo tee -a /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc
+sudo add-apt-repository "deb https://cloud.r-project.org/bin/linux/ubuntu $(lsb_release -cs)-cran40/"
 sudo apt update
 sudo apt upgrade
 
@@ -24,11 +25,10 @@ sudo apt -y install libssl-dev
 sudo apt install curl mlocate default-jdk -y
 
 # Define JAVA_HOME and add to PATH
-echo 'export JAVA_HOME=/usr/local/java' >> ~/.bashrc
-echo 'export PATH=$JAVA_HOME/bin:$PATH' >> ~/.bashrc
+echo 'export PATH=/usr/bin/java:$PATH' >> ~/.bashrc
 
 # Install Spark
-curl -o ~/spark.tgz -L https://dlcdn.apache.org/spark/spark-3.2.1/spark-3.2.1-bin-hadoop3.2.tgz
+curl -o ~/spark.tgz -L https://dlcdn.apache.org/spark/spark-3.3.2/spark-3.3.2-bin-hadoop3.tgz
 sudo rm -rf /usr/local/spark
 sudo mkdir /usr/local/spark
 sudo tar -xzf ~/spark.tgz -C /usr/local/spark --strip-components=1
@@ -39,25 +39,10 @@ echo 'export SPARK_HOME=/usr/local/spark' >> ~/.bashrc
 echo 'export PATH=$SPARK_HOME/bin:$PATH' >> ~/.bashrc
 echo 'export SPARK_LOCAL_IP="127.0.0.1"' >> ~/.bashrc
 
+conda env create -f ./environment.yml
+conda activate somospie
 
-# This command ensures that the conda environment is active 
-# - using pip outside of this enviornment results in
-# the python in ezj not having access to the libraries being installed.
-conda activate
-
-# Ensure pip3 is available
-sudo apt -y install python3-pip
-
-# Update pip
-pip install --upgrade pip
-
-# Install pyspark, findspark, sklearn, ipywe, and matplotlib
-pip install pyspark
-pip install findspark
-pip install sklearn
 #pip install ipywe # Installs old version of ipywe; conda does newer, but not new enough; we are using git submodules instead
-pip install matplotlib
-python3 install.py # ToDo: Investigate when and whether this is useful
 
 # Install R libraries
 sudo Rscript install.R

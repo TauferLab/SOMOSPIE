@@ -1,4 +1,11 @@
-needed.packages <- c("raster", "caret", "quantregForest", "kknn", "rgdal", "rasterVis", "optigrab", "rgeos", "ncdf4", "plotKML")
-for (pack in needed.packages) {
-    if (!require(pack, character.only=T)) install.packages(pack)
-}
+install.packages("raster")
+install.packages("caret")
+install.packages("quantregForest")
+install.packages("kknn")
+install.packages("rgdal")
+install.packages("rasterVis")
+install.packages("optigrab")
+install.packages("rgeos")
+install.packages("ncdf4")
+install.packages("dplyr")
+install.packages("plotKML")

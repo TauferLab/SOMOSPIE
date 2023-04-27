@@ -1,0 +1,15 @@
+name: somospie
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3.11.0
+  - gdal=3.6.2
+  - pip
+  - pip:
+    - pandas
+    - pyspark
+    - findspark
+    - scikit-learn
+    - matplotlib
+    - grass-session

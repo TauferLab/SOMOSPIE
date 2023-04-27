@@ -44,5 +44,5 @@ If all required R packages are not installed in the container, you can install t
 ```
 docker start <container_id>
 docker exec -u root -t -i <container_id> bash
-Rscript work/install/install_docker.R
+Rscript work/install/install.R
 ```

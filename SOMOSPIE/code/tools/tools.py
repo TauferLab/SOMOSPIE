@@ -1,3 +1,4 @@
+# Contributors: Camila Roa (@CamilaR20), Eric Vaughan (@VaughanEric), Andrew Mueller (@), Sam Baumann (@sam-baumann), David Huang (dhuang0212), Ben Klein (robobenklein)
 import os
 from pathlib import Path
 import glob
@@ -8,6 +9,7 @@ import numpy as np
 import pandas as pd
 import math
 import multiprocessing
+import concurrent.futures
 
 # In Ubuntu: sudo apt-get install grass grass-doc
 # pip install grass-session
@@ -15,6 +17,8 @@ from grass_session import Session
 import grass.script as gscript
 import tempfile
 
+# Increased the size of GDAL’s input-output buffer cache to reduce the number of look-up operations
+gdal.SetConfigOption("GDAL_CACHEMAX", "512")
 
 def bash(argv):
     arg_seq = [str(arg) for arg in argv]
@@ -26,15 +30,16 @@ def download_dem(file, folder):
     with open(file, 'r', encoding='utf8') as dsvfile:
         lines = dsvfile.readlines()
     
-    for line in lines:
-        comands = ['wget', '-P', folder, line.rstrip()]
-        bash(comands)
+    with concurrent.futures.ProcessPoolExecutor(max_workers=20) as executor:
+        for line in lines:
+            commands = ['wget', '-q', '-P', folder, line.rstrip()]
+            executor.submit(bash, commands)
 
 
 def merge_tiles(input_files, output_file):
     # input_files: list of .tif files to merge
     vrt = gdal.BuildVRT("merged.vrt", input_files)
-    translate_options = gdal.TranslateOptions(creationOptions=['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=YES'],
+    translate_options = gdal.TranslateOptions(creationOptions=['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=YES', 'NUM_THREADS=ALL_CPUS'],
                                               callback=gdal.TermProgress_nocb)
     gdal.Translate(output_file, vrt, options=translate_options)
     vrt = None  # closes file
@@ -47,8 +52,8 @@ def merge_tiles(input_files, output_file):
 
 def reproject(input_file, output_file, projection):
     # Projection can be EPSG:4326, .... or the path to a wkt file
-    warp_options = gdal.WarpOptions(dstSRS=projection, creationOptions=['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=YES'],
-                                    callback=gdal.TermProgress_nocb)
+    warp_options = gdal.WarpOptions(dstSRS=projection, creationOptions=['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=YES', 'NUM_THREADS=ALL_CPUS'],
+                                    callback=gdal.TermProgress_nocb, multithread=True, warpOptions=['NUM_THREADS=ALL_CPUS'])
     warp = gdal.Warp(output_file, input_file, options=warp_options)
     warp = None  # Closes the files
 
@@ -127,6 +132,22 @@ def get_extent(shp_file):
     return upper_left, lower_right
 
 
+def compute_geotiled(input_file):
+    out_folder = os.path.dirname(os.path.dirname(input_file))
+    out_file = os.path.join(out_folder,'slope_tiles', os.path.basename(input_file))
+    # Slope
+    dem_options = gdal.DEMProcessingOptions(format='GTiff', creationOptions=['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=YES'])
+    gdal.DEMProcessing(out_file, input_file, processing='slope', options=dem_options)
+    # Aspect
+    out_file = os.path.join(out_folder,'aspect_tiles', os.path.basename(input_file))
+    dem_options = gdal.DEMProcessingOptions(zeroForFlat=True, format='GTiff', creationOptions=['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=YES'])
+    gdal.DEMProcessing(out_file, input_file, processing='aspect', options=dem_options)
+    # Hillshading
+    out_file = os.path.join(out_folder,'hillshading_tiles', os.path.basename(input_file))
+    dem_options = gdal.DEMProcessingOptions(format='GTiff', creationOptions=['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=YES'])
+    gdal.DEMProcessing(out_file, input_file, processing='hillshade', options=dem_options)
+
+
 def compute_params(input_prefix, parameters):
     # Slope
     if 'slope' in parameters:
@@ -164,11 +185,26 @@ def compute_params(input_prefix, parameters):
         if 'profile_curvature' in parameters:
             gscript.run_command('r.slope.aspect', elevation='elevation', pcurvature='profile_curvature.tif', overwrite=True)
 
+        if 'convergence_index' in parameters:
+            gscript.run_command('r.convergence', input='elevation', output='convergence_index.tif', overwrite=True)
+
+        if 'valley_depth' in parameters:
+            gscript.run_command('r.valley.bottom', input='elevation', mrvbf='valley_depth.tif', overwrite=True)
+
+        if 'ls_factor' in parameters:
+            gscript.run_command('r.watershed', input='elevation', length_slope='ls_factor.tif', overwrite=True)
+
+
         tmpdir.cleanup()
         s.close()
         
         # Slope and aspect with GRASS GIS (uses underlying GDAL implementation)
         #vgscript.run_command('r.slope.aspect', elevation='elevation', aspect='aspect.tif', slope='slope.tif', overwrite=True)
+
+def compute_params_concurrently(input_prefix, parameters):
+    with concurrent.futures.ProcessPoolExecutor(max_workers=20) as executor:
+        for param in parameters:
+            executor.submit(compute_params, input_prefix, param)
 
 
 def extract_raster(csv_file, raster_file, band_names):
@@ -270,22 +306,6 @@ def crop_into_tiles(mosaic, out_folder, n_tiles):
 
             crop_pixels(mosaic, tile_file, win)
             tile_count += 1
-
-
-def compute_geotiled(input_file):
-    out_folder = os.path.dirname(os.path.dirname(input_file))
-    out_file = os.path.join(out_folder,'slope_tiles', os.path.basename(input_file))
-    # Slope
-    dem_options = gdal.DEMProcessingOptions(format='GTiff', creationOptions=['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=YES'])
-    gdal.DEMProcessing(out_file, input_file, processing='slope', options=dem_options)
-    # Aspect
-    out_file = os.path.join(out_folder,'aspect_tiles', os.path.basename(input_file))
-    dem_options = gdal.DEMProcessingOptions(zeroForFlat=True, format='GTiff', creationOptions=['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=YES'])
-    gdal.DEMProcessing(out_file, input_file, processing='aspect', options=dem_options)
-    # Hillshading
-    out_file = os.path.join(out_folder,'hillshading_tiles', os.path.basename(input_file))
-    dem_options = gdal.DEMProcessingOptions(format='GTiff', creationOptions=['COMPRESS=LZW', 'TILED=YES', 'BIGTIFF=YES'])
-    gdal.DEMProcessing(out_file, input_file, processing='hillshade', options=dem_options)
 
 
 def build_mosaic(input_files, output_file):

@@ -1,4 +1,5 @@
 *.DS_Store
+*.pkl
 *.pdf
 *.doc
 *.docx
@@ -25,11 +26,13 @@
 *.sbn
 *.sbx
 *.shp
+*.vrt
 *.xml
 *.shx
 *.img
 *.sdat
 *.sgrd
+*.wkt
 __pycache__
 SOMOSPIE/out/*
 SOMOSPIE/data/*

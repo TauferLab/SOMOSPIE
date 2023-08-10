@@ -314,7 +314,7 @@ def source_widget(default_widget):
 def sm_fetch(year=2017, sm_source="ESA"):
     if sm_source=="ESA":
         if (1978 < year < 2020):
-            sm_file = f"{SUB_SOIL}/ESA_CCI/{year}_ESA_monthly.rds"
+            sm_file = f"{SUB_DATA}/ESA_CCI/{year}_ESA_monthly.rds"
             if not os.path.exists(sm_file):
                 if not os.path.exists(f"{SUB_SOIL}/ESA_CCI/{year}"):
                     bash([f"{SUB_SOIL}/fetch_soil_moisture.sh", year])
@@ -723,7 +723,6 @@ def init_proc_widgets(arg_set):
             proc_set[j] = widgets.VBox((widgets.Label(arg_description), widgets.Text(arg_set.args[j])))
                                        
     proc_acc = init_accordion(proc_set)
-    display(proc_acc)
     return proc_acc
 
 # Takes a string and an Arg_Handler object.

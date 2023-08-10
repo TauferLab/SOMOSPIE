@@ -91,8 +91,14 @@ def download_file(bucket_name, item_name, file_path):
 
 def bash(argv):
     arg_seq = [str(arg) for arg in argv]
-    proc = subprocess.Popen(arg_seq)#, shell=True)
+    proc = subprocess.Popen(arg_seq, stdout=subprocess.PIPE, stderr=subprocess.PIPE)#, shell=True)
     proc.wait() #... unless intentionally asynchronous
+    stdout, stderr = proc.communicate()
+
+    # Error catching: https://stackoverflow.com/questions/5826427/can-a-python-script-execute-a-function-inside-a-bash-script
+    if proc.returncode != 0:
+        raise RuntimeError("'%s' failed, error code: '%s', stdout: '%s', stderr: '%s'" % (
+            ' '.join(arg_seq), proc.returncode, stdout.rstrip(), stderr.rstrip()))
         
 
 def cancel_uploads(json_file, bucket_name): 

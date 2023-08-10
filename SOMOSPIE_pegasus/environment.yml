@@ -1,0 +1,11 @@
+name: somospie
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python
+  - gdal
+  - pip
+  - pip:
+    - pandas
+    - scikit-learn

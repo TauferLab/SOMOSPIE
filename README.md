@@ -107,7 +107,7 @@ If you will install the dependencies of SOMOSPIE manually, see the following lis
   * GDAL
 
 ## Acknowledgments
-The authors acknowledge the support of the National Science Foundation through the awards 2103845 and 2103836; and the Access program through the NSF grant 2138296.
+
 This work partially developed and tested using the following [XSEDE computing resources](https://portal.xsede.org/group/xup/resource-monitor):
 * Stampede2
 * Jetstream

@@ -67,7 +67,9 @@ def crop_into_tiles(mosaic, out_file, n_tiles, idx_x, idx_y):
     win[2] = w if win[0] + w < cols else cols - win[0]
 
     h = win[3] + 2*buffer
-    win[3] = h if win[1] + h < cols else cols - win[1]
+    #We found a cropping error when the data was taller than wider
+    win[3] = h if win[1] + h < rows else rows - win[1]
+    #win[3] = h if win[1] + h < cols else cols - win[1]
 
     crop_pixels(mosaic, out_file, win)
 

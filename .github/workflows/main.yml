@@ -2,7 +2,7 @@ name: App Docker build and push
 on:
   push:
     branches:
-      - main
+      - master
 
 jobs:
   build:

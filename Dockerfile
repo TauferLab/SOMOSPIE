@@ -4,7 +4,7 @@ USER root
 
 RUN apt update -qqy && \
     apt-get install -y software-properties-common vim && \
-    apt-get install curl
+    apt-get install -y curl
 
 RUN apt install -y --no-install-recommends software-properties-common dirmngr && \
     wget -qO- https://cloud.r-project.org/bin/linux/ubuntu/marutter_pubkey.asc | sudo tee -a /etc/apt/trusted.gpg.d/cran_ubuntu_key.asc && \

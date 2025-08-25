@@ -15,7 +15,7 @@ The relevance of this work derives from a pressing need to improve the spatial r
 
 This Jupyter Notebook is a result of a collaboration between computer scientists of the Global Computing Laboratory at the Universtiy of Tennessee, Knoxville and soil scientists at the University of Delware (funded by NSF awards #1724843 and #1854312).
 
-This repository contains a suite of tools for tprocessing spatial environmental data, generating fine-grained soil moisture predictions with machine-learning techniques, and analyzing these predictions. The core components of this tool suite are as follows.  
+This repository contains a suite of tools for processing spatial environmental data, generating fine-grained soil moisture predictions with machine-learning techniques, and analyzing these predictions. The core components of this tool suite are as follows.  
 * The SOMOSPIE framework with the next stages:
   1. Preprocessing
   2. Modeling: ML models

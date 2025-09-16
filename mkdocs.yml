@@ -1,0 +1,72 @@
+site_name: SOMOSPIE Documentation
+repo_url: https://github.com/TauferLab/SOMOSPIE
+theme:
+  name: material
+  logo: assets/logo_white.png
+  favicon: assets/logo_white.png
+  palette:
+    - scheme: default
+      primary: cyan
+      accent: cyan
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - scheme: slate
+      primary: cyan
+      accent: cyan
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    admonition:
+      note: octicons/tag-16
+      abstract: octicons/checklist-16
+      info: octicons/info-16
+      tip: octicons/squirrel-16
+      success: octicons/check-16
+      question: octicons/question-16
+      warning: octicons/alert-16
+      failure: octicons/x-circle-16
+      danger: octicons/zap-16
+      bug: octicons/bug-16
+      example: octicons/beaker-16
+      quote: octicons/quote-16
+  features:
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - navigation.sections
+    - navigation.instant
+    - navigation.instant.progress
+    - navigation.footer
+    - navigation.top
+    - navigation.path
+    - navigation.expand
+    - search.suggest
+
+markdown_extensions:
+  - admonition
+  - codehilite
+  - pymdownx.highlight
+  - pymdownx.superfences
+  - pymdownx.details
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+nav:
+  - Home: SOMOSPIE.md
+  - Installation: installation.md
+  - Data Guide: data_guide.md
+  - Data Preprocessing: data_preparations.md
+  - Machine Learning Algorithms: soil_moisture_predictions.md
+  - Other Features: additional_features.md
+  - Research:
+      - Publications: Research/publications.md
+      - Acknowledgements: Research/acknowledgements.md
+
+extra_css:
+  - stylesheets/extra.css
+
+copyright: >
+  SENSORY is funded by the National Science Foundation (NSF) under grant numbers #1724843, #1854312, #2103836, #2103845, #2138811, and #2334945. Any opinions, findings, and conclusions, or recommendations expressed in this material are those of the author(s) and do not necessarily reflect the views of the National Science Foundation.

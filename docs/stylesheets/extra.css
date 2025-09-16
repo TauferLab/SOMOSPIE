@@ -1,0 +1,8 @@
+.icon-color {
+  color: black;
+}
+
+.md-typeset .admonition,
+.md-typeset details {
+  font-size: 0.9em;
+}

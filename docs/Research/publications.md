@@ -1,0 +1,3 @@
+_This paper presents theory, artifacts, and results on which SOMOSPIE is built:_
+
+D. Rorabaugh, M. Guevara, R. Llamas, J. Kitson, R. Vargas, and M. Taufer. **SOMOSPIE: A Modular SOil MOisture SPatial Inference Engine based on Data Driven Decisions.** _In Proceedings of the IEEE eScience Conference_, pp. 1-10. San Diego, CA, USA. September 24-27, (2019). [Link to Publication](https://ieeexplore.ieee.org/document/9041768)

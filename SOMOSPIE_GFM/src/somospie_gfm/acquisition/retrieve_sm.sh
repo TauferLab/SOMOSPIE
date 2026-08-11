@@ -1,8 +1,8 @@
 #!/bin/bash
 
 year=$1
+output_dir=$2
 version=9.2
-sm_dir="/work/hdd/bebq/jweeks2/prithvi_workflow/ESA_CCI"
 
 if [ ! -d ${sm_dir}/${year} ]; then
     mkdir -p ${sm_dir}/${year}

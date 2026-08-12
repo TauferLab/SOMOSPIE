@@ -57,7 +57,23 @@ MIN_VALID_FRACTION = 0.01
 
 @dataclass
 class Accumulator:
-    """Numerically stable streaming moments for a fixed channel list."""
+    """Accumulate shifted streaming moments for a fixed channel layout.
+
+    Attributes
+    ----------
+    names : list of str
+        Channel names defining required input order.
+    shift : numpy.ndarray
+        First valid per-channel mean used to center sums for stability.
+    sums, square_sums : numpy.ndarray
+        Shifted first and second moments.
+    counts : numpy.ndarray
+        Valid-pixel count per channel.
+    initialized : numpy.ndarray
+        Whether each channel has observed at least one finite value.
+    total : int
+        Spatial pixels examined per channel, including invalid pixels.
+    """
 
     names: list[str]
     shift: np.ndarray = field(init=False)
@@ -68,6 +84,18 @@ class Accumulator:
     total: int = 0
 
     def __post_init__(self) -> None:
+        """Allocate zeroed float64 accumulation arrays after initialization.
+
+        Returns
+        -------
+        None
+            Internal arrays are initialized in place from ``names`` length.
+
+        Notes
+        -----
+        Dataclass construction supplies all state; this method has no parameters
+        beyond ``self`` and intentionally performs no I/O.
+        """
         channels = len(self.names)
         self.shift = np.zeros(channels, dtype=np.float64)
         self.sums = np.zeros(channels, dtype=np.float64)
@@ -76,7 +104,24 @@ class Accumulator:
         self.initialized = np.zeros(channels, dtype=bool)
 
     def update(self, data: np.ndarray) -> None:
-        """Add one channels-first tile, ignoring non-finite pixels."""
+        """Add one channels-first tile while ignoring non-finite pixels.
+
+        Parameters
+        ----------
+        data : numpy.ndarray
+            Three-dimensional ``[channels, height, width]`` tile data.
+
+        Returns
+        -------
+        None
+            Moments, counts, and total pixels are updated in place.
+
+        Raises
+        ------
+        ValueError
+            If data is not three-dimensional or channel count differs from
+            ``names``.
+        """
         if data.ndim != 3 or data.shape[0] != len(self.names):
             raise ValueError(
                 f"tile shape {data.shape} does not match "
@@ -97,7 +142,18 @@ class Accumulator:
             self.counts[index] += values.size
 
     def finalize(self) -> tuple[np.ndarray, np.ndarray]:
-        """Return float32 population means and standard deviations."""
+        """Finalize population moments into normalization-ready arrays.
+
+        Returns
+        -------
+        tuple of numpy.ndarray
+            Float32 means and population standard deviations. Empty channels
+            receive mean 0/std 1; tiny standard deviations are clamped.
+
+        Notes
+        -----
+        Finalization does not mutate accumulated moments and may be repeated.
+        """
         divisors = np.maximum(self.counts, 1)
         means = self.shift + self.sums / divisors
         variances = (
@@ -113,12 +169,46 @@ class Accumulator:
 
 
 def split_paths(value: str) -> list[Path]:
-    """Split a comma-separated path option."""
+    """Split one comma-separated path option.
+
+    Parameters
+    ----------
+    value : str
+        Raw comma-separated CLI value.
+
+    Returns
+    -------
+    list of pathlib.Path
+        Non-empty stripped path components in source order.
+
+    Notes
+    -----
+    Existence is validated during tile discovery.
+    """
     return [Path(item.strip()) for item in value.split(",") if item.strip()]
 
 
 def find_tiles(roots: Sequence[Path]) -> list[Path]:
-    """Find sorted, deduplicated prepared tiles below one or more roots."""
+    """Find deterministic prepared-tile inputs below validated roots.
+
+    Parameters
+    ----------
+    roots : sequence of pathlib.Path
+        Directories searched recursively for ``tile_*.tif``.
+
+    Returns
+    -------
+    list of pathlib.Path
+        Sorted, absolute, deduplicated tile paths.
+
+    Raises
+    ------
+    FileNotFoundError
+        If any root is missing or no tiles are found.
+    """
+    missing = [root for root in roots if not root.is_dir()]
+    if missing:
+        raise FileNotFoundError(f"tile root(s) not found: {missing}")
     tiles = {
         tile.resolve()
         for root in roots
@@ -137,7 +227,27 @@ def sample_tiles(
     max_tiles: int,
     seed: int,
 ) -> list[Path]:
-    """Select a reproducible, sorted subset of tiles."""
+    """Select a reproducible subset without changing filesystem order.
+
+    Parameters
+    ----------
+    tiles : sequence of pathlib.Path
+        Deterministically ordered population.
+    max_tiles : int
+        Maximum sample size; non-positive values select all tiles.
+    seed : int
+        NumPy random seed used when subsampling.
+
+    Returns
+    -------
+    list of pathlib.Path
+        All tiles or a reproducible subset in original sorted order.
+
+    Raises
+    ------
+    ValueError
+        Propagated by NumPy if an invalid sample request reaches the generator.
+    """
     if max_tiles <= 0 or len(tiles) <= max_tiles:
         return list(tiles)
     random = np.random.default_rng(seed)
@@ -150,7 +260,27 @@ def resolve_band_indices(
     descriptions: Sequence[str],
     source_count: int,
 ) -> list[int]:
-    """Map requested HLS names to zero-based source band indices."""
+    """Resolve model HLS names against descriptions or legacy band layout.
+
+    Parameters
+    ----------
+    requested : sequence of str
+        Canonical HLS names in desired model order.
+    descriptions : sequence of str
+        Per-band GDAL descriptions from the source tile.
+    source_count : int
+        Total source bands, used to recognize the legacy 13-band layout.
+
+    Returns
+    -------
+    list of int
+        Zero-based indices parallel to ``requested``.
+
+    Raises
+    ------
+    ValueError
+        If requested bands cannot be identified unambiguously.
+    """
     named = {
         description.strip().upper(): index
         for index, description in enumerate(descriptions)
@@ -180,7 +310,22 @@ def resolve_terrain_for_tile(
     terrain_map: dict[str, Path] | None,
     terrain_stack: Path | None,
 ) -> Path | None:
-    """Resolve the terrain stack associated with a tile path."""
+    """Resolve a region-mapped terrain stack or shared fallback.
+
+    Parameters
+    ----------
+    tile_path : pathlib.Path
+        Tile whose path components encode its region.
+    terrain_map : dict of str to pathlib.Path or None
+        Optional region-specific stack mapping.
+    terrain_stack : pathlib.Path or None
+        Shared fallback stack.
+
+    Returns
+    -------
+    pathlib.Path or None
+        Mapped stack, fallback, or ``None`` when terrain is disabled.
+    """
     if terrain_map:
         components = {
             component.lower().replace(" ", "_")
@@ -195,7 +340,23 @@ def resolve_terrain_for_tile(
 def _tile_metadata(
     dataset: gdal.Dataset,
 ) -> tuple[list[str], tuple[float, ...], int, int]:
-    """Read band descriptions and grid metadata from an open tile."""
+    """Extract channel descriptions and spatial dimensions from a tile.
+
+    Parameters
+    ----------
+    dataset : osgeo.gdal.Dataset
+        Open prepared HLS tile.
+
+    Returns
+    -------
+    tuple
+        Descriptions, affine geotransform, width, and height.
+
+    Raises
+    ------
+    RuntimeError
+        Propagated by GDAL when metadata cannot be read.
+    """
     descriptions = [
         dataset.GetRasterBand(index).GetDescription() or ""
         for index in range(1, dataset.RasterCount + 1)
@@ -213,7 +374,30 @@ def read_fused_tile(
     band_indices: Sequence[int],
     aligned: AlignedTerrain | None,
 ) -> np.ndarray:
-    """Read selected HLS bands and optional aligned terrain as float32."""
+    """Read the exact channels presented to training for one tile.
+
+    Parameters
+    ----------
+    tile_path : pathlib.Path
+        Prepared HLS tile.
+    band_indices : sequence of int
+        Zero-based HLS bands in model order.
+    aligned : AlignedTerrain or None
+        Optional terrain cache from which the matching window is read.
+
+    Returns
+    -------
+    numpy.ndarray
+        Float32 channels-first HLS data, optionally followed by terrain, with
+        all declared/non-finite nodata converted to NaN.
+
+    Raises
+    ------
+    RuntimeError
+        If GDAL cannot open/read a requested band or terrain window.
+    ValueError
+        If the terrain window does not match tile dimensions.
+    """
     dataset = gdal.Open(str(tile_path))
     if dataset is None:
         raise RuntimeError(f"Could not open tile: {tile_path}")
@@ -253,7 +437,23 @@ def read_fused_tile(
 
 
 def terrain_band_names(aligned: AlignedTerrain | None) -> list[str]:
-    """Return named terrain channels, falling back to positional labels."""
+    """Read stable terrain channel names from an aligned mosaic.
+
+    Parameters
+    ----------
+    aligned : AlignedTerrain or None
+        Terrain cache metadata; ``None`` means HLS-only inputs.
+
+    Returns
+    -------
+    list of str
+        GDAL descriptions or ``terrain_XX`` fallbacks; empty without terrain.
+
+    Raises
+    ------
+    RuntimeError
+        If the aligned terrain raster cannot be opened.
+    """
     if aligned is None:
         return []
     dataset = gdal.Open(str(aligned.path))
@@ -279,7 +479,30 @@ def find_degenerate(
     counts: np.ndarray,
     total: int,
 ) -> list[dict[str, object]]:
-    """Describe empty, constant, sentinel-like, or mostly empty channels."""
+    """Identify channels that are unsafe or uninformative for normalization.
+
+    Parameters
+    ----------
+    names : sequence of str
+        Channel names parallel to all statistics arrays.
+    means, stds : numpy.ndarray
+        Final per-channel population moments.
+    counts : numpy.ndarray
+        Valid pixels per channel.
+    total : int
+        Pixels examined per channel.
+
+    Returns
+    -------
+    list of dict
+        JSON-ready issue records for empty, constant, sentinel-like, or
+        mostly-invalid channels.
+
+    Raises
+    ------
+    IndexError
+        If supplied arrays are shorter than ``names``.
+    """
     issues: list[dict[str, object]] = []
     for index, name in enumerate(names):
         valid_fraction = float(counts[index] / total) if total else 0
@@ -320,7 +543,31 @@ def provenance_key(
     sampled: int,
     seed: int,
 ) -> dict[str, object]:
-    """Build a JSON-serializable fingerprint of the statistics inputs."""
+    """Build reproducibility metadata for one statistics artifact.
+
+    Parameters
+    ----------
+    bands, channel_names : sequence of str
+        Requested HLS bands and complete fused channel layout.
+    tile_roots : sequence of pathlib.Path
+        Prepared-tile discovery roots.
+    terrain_stacks : sequence of pathlib.Path
+        Terrain sources whose size/mtime are fingerprinted when present.
+    sampled : int
+        Number of measured tiles.
+    seed : int
+        Sampling seed.
+
+    Returns
+    -------
+    dict
+        JSON-serializable provenance key.
+
+    Raises
+    ------
+    OSError
+        If metadata for an existing terrain stack cannot be read.
+    """
     stack_records = []
     for stack in sorted({path.resolve() for path in terrain_stacks}):
         record: dict[str, object] = {"path": str(stack)}
@@ -349,7 +596,27 @@ def _aligned_for_tile(
     terrain_stack: Path | None,
     aligned_by_stack: dict[Path, AlignedTerrain],
 ) -> AlignedTerrain | None:
-    """Return a tile's aligned terrain object and reject missing mappings."""
+    """Resolve a tile to its already-built aligned terrain record.
+
+    Parameters
+    ----------
+    tile : pathlib.Path
+        Prepared tile being measured.
+    terrain_map, terrain_stack
+        Region mapping and shared fallback used for resolution.
+    aligned_by_stack : dict
+        Absolute source paths mapped to built cache records.
+
+    Returns
+    -------
+    AlignedTerrain or None
+        Matching cache, or ``None`` for an HLS-only run.
+
+    Raises
+    ------
+    ValueError
+        If a configured terrain mapping does not resolve or was not built.
+    """
     stack = resolve_terrain_for_tile(tile, terrain_map, terrain_stack)
     if stack is None:
         if terrain_map:
@@ -362,7 +629,27 @@ def _aligned_for_tile(
 
 
 def _band_indices_for_tile(tile: Path, bands: Sequence[str]) -> list[int]:
-    """Resolve selected bands from one tile's own metadata."""
+    """Resolve model-band indices using one tile's actual header.
+
+    Parameters
+    ----------
+    tile : pathlib.Path
+        Prepared HLS tile to inspect.
+    bands : sequence of str
+        Canonical requested band names.
+
+    Returns
+    -------
+    list of int
+        Zero-based band indices in requested order.
+
+    Raises
+    ------
+    RuntimeError
+        If GDAL cannot open the tile.
+    ValueError
+        If band names cannot be resolved.
+    """
     dataset = gdal.Open(str(tile))
     if dataset is None:
         raise RuntimeError(f"Could not open tile: {tile}")
@@ -382,7 +669,40 @@ def compute(
     max_tiles: int,
     seed: int,
 ) -> dict[str, object]:
-    """Compute the complete statistics artifact."""
+    """Compute normalization statistics over reproducibly sampled fused tiles.
+
+    Parameters
+    ----------
+    tile_roots : list of pathlib.Path
+        Prepared-tile roots.
+    bands : list of str
+        HLS channels in model order.
+    terrain_map : dict of str to pathlib.Path or None
+        Optional region-specific terrain mapping.
+    terrain_stack : pathlib.Path or None
+        Optional shared terrain stack.
+    aligned_dir : pathlib.Path
+        Directory used to build/reuse aligned terrain caches.
+    max_tiles : int
+        Maximum tiles to measure; non-positive means all.
+    seed : int
+        Reproducible sampling seed.
+
+    Returns
+    -------
+    dict
+        JSON-ready means, standard deviations, valid fractions, degeneracy
+        warnings, and provenance.
+
+    Raises
+    ------
+    FileNotFoundError
+        If tile roots, tiles, or configured terrain stacks are missing.
+    ValueError
+        If band layouts, terrain mappings, or fused channel layouts differ.
+    RuntimeError
+        If GDAL cannot read tiles or build/read terrain caches.
+    """
     tiles = find_tiles(tile_roots)
     sampled = sample_tiles(tiles, max_tiles, seed)
     print(f"Found {len(tiles)} tiles; measuring {len(sampled)}", flush=True)
@@ -458,7 +778,23 @@ def compute(
 
 
 def report(stats: dict[str, Any]) -> None:
-    """Print statistics and degenerate-channel warnings."""
+    """Print a human-readable statistics table and channel warnings.
+
+    Parameters
+    ----------
+    stats : dict
+        Artifact returned by :func:`compute`.
+
+    Returns
+    -------
+    None
+        The report is written to standard output.
+
+    Raises
+    ------
+    KeyError, IndexError
+        If ``stats`` does not follow the artifact schema.
+    """
     names = stats["key"]["channel_names"]
     print(f"\n{'channel':>24}  {'mean':>14}  {'std':>14}  {'valid':>7}")
     for index, name in enumerate(names):
@@ -476,7 +812,23 @@ def report(stats: dict[str, Any]) -> None:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse command-line arguments."""
+    """Parse normalization-statistics command-line options.
+
+    Parameters
+    ----------
+    argv : list of str or None, optional
+        Explicit arguments; ``None`` reads process arguments.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed bands, roots, terrain source, sampling, and output options.
+
+    Raises
+    ------
+    SystemExit
+        Raised by ``argparse`` for invalid options or ``--help``.
+    """
     parser = argparse.ArgumentParser(
         description=__doc__.splitlines()[0],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -535,7 +887,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def _read_terrain_map(path: Path) -> dict[str, Path]:
-    """Read and validate a region-to-terrain JSON mapping."""
+    """Read and validate a region-to-terrain JSON object.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        JSON mapping file.
+
+    Returns
+    -------
+    dict of str to pathlib.Path
+        Validated region mapping.
+
+    Raises
+    ------
+    SystemExit
+        If the file is unreadable, invalid JSON, or not string-to-string.
+    """
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -551,7 +919,29 @@ def _read_terrain_map(path: Path) -> dict[str, Path]:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Compute and atomically write a normalization-statistics artifact."""
+    """Compute, report, and atomically publish normalization statistics.
+
+    Parameters
+    ----------
+    argv : list of str or None, optional
+        Command-line arguments forwarded to :func:`parse_args`.
+
+    Returns
+    -------
+    None
+        JSON output and a terminal report are produced as side effects.
+
+    Raises
+    ------
+    SystemExit
+        For invalid band selection/mapping or strict degeneracy failures.
+    FileNotFoundError
+        If tiles or configured inputs are missing.
+    ValueError, RuntimeError
+        If channel/grid validation or GDAL processing fails.
+    OSError
+        If the JSON cannot be written or atomically replaced.
+    """
     args = parse_args(argv)
     if args.output.exists() and not args.force:
         print(f"{args.output} already exists; use --force to recompute")

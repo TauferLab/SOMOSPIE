@@ -26,7 +26,21 @@ FIELD_RE = re.compile(r"[A-Za-z_][A-Za-z0-9_]*")
 
 @dataclass(frozen=True)
 class RegionSelection:
-    """A validated vector-layer filter and its selected geometries."""
+    """Capture a validated ecoregion selection for repeated raster cuts.
+
+    Attributes
+    ----------
+    shapefile : pathlib.Path
+        Vector dataset passed to GDAL as the cutline source.
+    layer_name : str
+        OGR layer containing the selected features.
+    where : str
+        Validated OGR attribute expression selecting the ecoregion.
+    source_crs : str
+        Vector CRS as WKT.
+    geometries : tuple of bytes
+        Selected geometries serialized as WKB for bounds calculations.
+    """
 
     shapefile: Path
     layer_name: str
@@ -37,14 +51,38 @@ class RegionSelection:
 
 @dataclass(frozen=True)
 class ProduceReport:
-    """Counts from one terrain-production run."""
+    """Record outputs created and deliberately skipped by one run.
+
+    Attributes
+    ----------
+    written : tuple of pathlib.Path
+        New or overwritten cropped rasters.
+    skipped : tuple of pathlib.Path
+        Existing outputs retained because overwrite was disabled.
+    """
 
     written: tuple[Path, ...]
     skipped: tuple[Path, ...]
 
 
 def infer_level(code: str) -> int:
-    """Infer CEC hierarchy level from a dotted ecoregion code."""
+    """Infer the CEC hierarchy level from dotted code depth.
+
+    Parameters
+    ----------
+    code : str
+        Ecoregion code such as ``"6"``, ``"6.2"``, or ``"6.2.13"``.
+
+    Returns
+    -------
+    int
+        Hierarchy level 1, 2, or 3.
+
+    Raises
+    ------
+    ValueError
+        If the code has no components or more than three components.
+    """
     parts = [part for part in code.split(".") if part]
     if not 1 <= len(parts) <= 3:
         raise ValueError(
@@ -54,7 +92,27 @@ def infer_level(code: str) -> int:
 
 
 def find_shapefile(root: Path, level: int) -> Path:
-    """Find the downloaded CEC shapefile for one hierarchy level."""
+    """Locate exactly one downloaded CEC shapefile for a hierarchy level.
+
+    Parameters
+    ----------
+    root : pathlib.Path
+        Shapefile root populated by the acquisition script.
+    level : int
+        Requested CEC level, normally 1-3.
+
+    Returns
+    -------
+    pathlib.Path
+        Preferred matching shapefile below ``root/level<level>``.
+
+    Raises
+    ------
+    FileNotFoundError
+        If no shapefile exists for the requested level.
+    ValueError
+        If multiple equally plausible shapefiles make selection ambiguous.
+    """
     directory = root / f"level{level}"
     candidates = (
         sorted(
@@ -93,7 +151,28 @@ def _attribute_filter(
     field_type: int,
     code: str,
 ) -> str:
-    """Build a safe OGR attribute filter for the selected code."""
+    """Build a type-correct, injection-resistant OGR attribute filter.
+
+    Parameters
+    ----------
+    field_name : str
+        Valid OGR field identifier.
+    field_type : int
+        OGR field type constant used to choose numeric or quoted syntax.
+    code : str
+        Ecoregion code to compare against the field.
+
+    Returns
+    -------
+    str
+        OGR SQL expression selecting the requested code.
+
+    Raises
+    ------
+    ValueError
+        If the field identifier is unsafe or a numeric field receives a
+        nonnumeric code.
+    """
     if not FIELD_RE.fullmatch(field_name):
         raise ValueError(f"invalid shapefile field name: {field_name!r}")
 
@@ -116,7 +195,31 @@ def load_region(
     code_field: str,
     code: str,
 ) -> RegionSelection:
-    """Validate and load all geometries matching an ecoregion code."""
+    """Validate a shapefile and materialize one ecoregion selection.
+
+    Parameters
+    ----------
+    shapefile : pathlib.Path
+        ESRI shapefile containing ecoregion polygons.
+    code_field : str
+        Attribute field holding region codes.
+    code : str
+        Code whose features will form the cutline.
+
+    Returns
+    -------
+    RegionSelection
+        Layer/filter metadata and non-empty selected geometries.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the ``.shp``, ``.dbf``, or ``.shx`` component is missing.
+    RuntimeError
+        If OGR cannot open the shapefile or access its first layer.
+    ValueError
+        If the field/filter/CRS is invalid or no matching geometry exists.
+    """
     if not shapefile.is_file():
         raise FileNotFoundError(f"shapefile not found: {shapefile}")
     for suffix in (".dbf", ".shx"):
@@ -176,7 +279,23 @@ def load_region(
 
 
 def _traditional_axis_order(spatial_ref: osr.SpatialReference) -> None:
-    """Use x/y axis order consistently across GDAL versions."""
+    """Configure a spatial reference for traditional GIS x/y axis order.
+
+    Parameters
+    ----------
+    spatial_ref : osgeo.osr.SpatialReference
+        Mutable CRS object to configure when the installed GDAL supports axis
+        mapping strategies.
+
+    Returns
+    -------
+    None
+        ``spatial_ref`` is modified in place.
+
+    Notes
+    -----
+    Older GDAL bindings without ``SetAxisMappingStrategy`` are left unchanged.
+    """
     if hasattr(spatial_ref, "SetAxisMappingStrategy"):
         spatial_ref.SetAxisMappingStrategy(osr.OAMS_TRADITIONAL_GIS_ORDER)
 
@@ -185,7 +304,27 @@ def region_bounds(
     selection: RegionSelection,
     destination_crs: str,
 ) -> tuple[float, float, float, float]:
-    """Return selected geometry bounds transformed to a raster CRS."""
+    """Transform selected geometry and compute its combined raster-CRS bounds.
+
+    Parameters
+    ----------
+    selection : RegionSelection
+        WKB geometries and source CRS to transform.
+    destination_crs : str
+        Target raster CRS as WKT or another OSR-compatible definition.
+
+    Returns
+    -------
+    tuple of float
+        Combined ``(min_x, min_y, max_x, max_y)`` bounds.
+
+    Raises
+    ------
+    ValueError
+        If either CRS cannot be parsed.
+    RuntimeError
+        If WKB restoration or coordinate transformation fails.
+    """
     source = osr.SpatialReference()
     target = osr.SpatialReference()
     if source.ImportFromWkt(selection.source_crs) not in (None, 0):
@@ -215,7 +354,26 @@ def aligned_window(
     dataset: gdal.Dataset,
     bounds: tuple[float, float, float, float],
 ) -> tuple[tuple[float, float, float, float], int, int]:
-    """Clip geometry bounds to a raster and align them to its pixel grid."""
+    """Clip ecoregion bounds and snap the crop outward to source pixels.
+
+    Parameters
+    ----------
+    dataset : osgeo.gdal.Dataset
+        Open parent terrain raster defining the grid and extent.
+    bounds : tuple of float
+        Ecoregion ``(min_x, min_y, max_x, max_y)`` in the raster CRS.
+
+    Returns
+    -------
+    tuple
+        GDAL output bounds plus integer output width and height.
+
+    Raises
+    ------
+    ValueError
+        If the raster is rotated/not north-up or the ecoregion does not
+        overlap it.
+    """
     transform = dataset.GetGeoTransform()
     if transform[2] != 0 or transform[4] != 0:
         raise ValueError("rotated terrain grids are not supported")
@@ -258,7 +416,24 @@ def aligned_window(
 
 
 def _common_nodata(dataset: gdal.Dataset) -> float | None:
-    """Return a common source nodata value, rejecting inconsistent bands."""
+    """Resolve one safe nodata value shared by every raster band.
+
+    Parameters
+    ----------
+    dataset : osgeo.gdal.Dataset
+        Open potentially multi-band terrain raster.
+
+    Returns
+    -------
+    float or None
+        Shared declared nodata, including NaN, or ``None`` when no band
+        declares nodata.
+
+    Raises
+    ------
+    ValueError
+        If only some bands declare nodata or declared values differ.
+    """
     values = [
         dataset.GetRasterBand(index).GetNoDataValue()
         for index in range(1, dataset.RasterCount + 1)
@@ -283,7 +458,34 @@ def crop_raster(
     selection: RegionSelection,
     nodata: float | None,
 ) -> Path:
-    """Crop and mask one terrain raster, replacing no existing files."""
+    """Crop and polygon-mask one terrain raster on its original pixel grid.
+
+    Parameters
+    ----------
+    source_path : pathlib.Path
+        Parent-region terrain GeoTIFF.
+    output_path : pathlib.Path
+        Destination written through a neighboring temporary file.
+    selection : RegionSelection
+        Cutline layer, filter, CRS, and geometry bounds.
+    nodata : float or None
+        Explicit destination nodata; source nodata or ``-9999`` is used when
+        omitted.
+
+    Returns
+    -------
+    pathlib.Path
+        Published ``output_path``.
+
+    Raises
+    ------
+    RuntimeError
+        If GDAL cannot open, transform, or warp the raster.
+    ValueError
+        If CRS, grid, overlap, or per-band nodata metadata is invalid.
+    OSError
+        If output directories, temporary files, or atomic replacement fail.
+    """
     source = gdal.Open(str(source_path))
     if source is None:
         raise RuntimeError(f"could not open terrain raster: {source_path}")
@@ -353,7 +555,25 @@ def crop_raster(
 
 
 def find_rasters(input_dir: Path, recursive: bool) -> list[Path]:
-    """Find input GeoTIFFs in deterministic order."""
+    """Discover terrain GeoTIFFs in deterministic order.
+
+    Parameters
+    ----------
+    input_dir : pathlib.Path
+        Directory to scan.
+    recursive : bool
+        Include nested directories when true.
+
+    Returns
+    -------
+    list of pathlib.Path
+        Sorted ``.tif`` and ``.tiff`` files; possibly empty.
+
+    Raises
+    ------
+    OSError
+        If directory enumeration fails.
+    """
     iterator = input_dir.rglob("*") if recursive else input_dir.iterdir()
     return sorted(
         path
@@ -370,7 +590,35 @@ def produce(
     recursive: bool,
     overwrite: bool,
 ) -> ProduceReport:
-    """Produce every terrain parameter raster for one sub-ecoregion."""
+    """Crop every terrain parameter in a directory to one sub-ecoregion.
+
+    Parameters
+    ----------
+    input_dir, output_dir : pathlib.Path
+        Parent-region source directory and separate destination directory.
+    selection : RegionSelection
+        Validated ecoregion cutline.
+    nodata : float or None
+        Optional destination nodata override.
+    recursive : bool
+        Recurse and preserve relative subdirectory layout.
+    overwrite : bool
+        Replace existing outputs when true; otherwise record them as skipped.
+
+    Returns
+    -------
+    ProduceReport
+        Immutable lists of written and skipped paths.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the input directory or its GeoTIFFs are missing.
+    ValueError
+        If input/output layout is unsafe or a crop fails validation.
+    RuntimeError
+        If GDAL cannot process a source raster.
+    """
     if not input_dir.is_dir():
         raise FileNotFoundError(f"terrain input directory not found: {input_dir}")
     input_resolved = input_dir.resolve()
@@ -401,7 +649,23 @@ def produce(
 
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
-    """Parse command-line arguments."""
+    """Parse ecoregion-terrain production options.
+
+    Parameters
+    ----------
+    argv : sequence of str or None, optional
+        Explicit arguments; ``None`` reads process arguments.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed directories, ecoregion selection, nodata, and overwrite flags.
+
+    Raises
+    ------
+    SystemExit
+        Raised by ``argparse`` for invalid options or ``--help``.
+    """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--input-dir",
@@ -460,7 +724,27 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: Sequence[str] | None = None) -> None:
-    """Produce cropped terrain parameters from the command line."""
+    """Resolve one ecoregion and crop all requested terrain parameters.
+
+    Parameters
+    ----------
+    argv : sequence of str or None, optional
+        Command-line arguments forwarded to :func:`parse_args`.
+
+    Returns
+    -------
+    None
+        Cropped rasters and a completion summary are written as side effects.
+
+    Raises
+    ------
+    FileNotFoundError
+        If shapefile components, input rasters, or directories are missing.
+    ValueError
+        If the code, shapefile, CRS, grid, or output layout is invalid.
+    RuntimeError
+        If OGR/GDAL cannot read geometry or crop a raster.
+    """
     args = parse_args(argv)
     level = args.level or infer_level(args.ecoregion)
     shapefile = args.shapefile or find_shapefile(args.shapefiles_root, level)

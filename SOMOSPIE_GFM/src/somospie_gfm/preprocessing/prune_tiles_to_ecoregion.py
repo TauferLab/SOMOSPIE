@@ -8,6 +8,7 @@ are kept whole. The command is a dry run unless --apply is supplied.
 from __future__ import annotations
 
 import argparse
+import os
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -18,22 +19,35 @@ from osgeo import gdal
 from shapely.geometry import box
 from shapely.strtree import STRtree
 
+try:
+    from .produce_ecoregion_terrain import find_shapefile
+except ImportError:
+    from produce_ecoregion_terrain import find_shapefile
+
 gdal.UseExceptions()
 
-PACKAGE_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_SHAPEFILE = (
-    PACKAGE_ROOT
-    / "data"
-    / "EPA_ecoregions"
-    / "na_cec_eco_l3"
-    / "NA_CEC_Eco_Level3.shp"
-)
+PROJECT_ROOT = Path(__file__).resolve().parents[3]
+DEFAULT_SHAPEFILES_ROOT = PROJECT_ROOT / "resources" / "shapefiles"
 TILE_RE = re.compile(r"tile_r(\d+)_c(\d+)\.tif$", re.IGNORECASE)
 
 
 @dataclass(frozen=True)
 class PruneReport:
-    """Summary of a pruning run."""
+    """Summarize the scope and effect of one pruning run.
+
+    Attributes
+    ----------
+    total : int
+        Prepared tiles examined.
+    kept : int
+        Tiles touching or overlapping the selected ecoregion.
+    removed : int
+        Tiles outside the ecoregion.
+    bytes_removed : int
+        Total size of outside tiles, whether deleted or only proposed.
+    applied : bool
+        Whether deletion actually occurred instead of a dry run.
+    """
 
     total: int
     kept: int
@@ -42,7 +56,17 @@ class PruneReport:
     applied: bool
 
     def summary(self) -> str:
-        """Return a concise human-readable summary."""
+        """Format counts, percentage, and recoverable storage for display.
+
+        Returns
+        -------
+        str
+            One-line dry-run or applied summary.
+
+        Notes
+        -----
+        Empty runs report a zero percentage instead of dividing by zero.
+        """
         percentage = 100 * self.removed / self.total if self.total else 0
         action = "deleted" if self.applied else "would delete"
         return (
@@ -53,7 +77,23 @@ class PruneReport:
 
 
 def _tile_row_col(path: Path) -> tuple[int, int]:
-    """Read a tile's row and column from its filename."""
+    """Parse lattice row and column indices from a prepared-tile filename.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Tile named ``tile_r<row>_c<column>.tif``.
+
+    Returns
+    -------
+    tuple of int
+        Zero- or one-based row/column values exactly as encoded.
+
+    Raises
+    ------
+    ValueError
+        If the basename does not follow the required convention.
+    """
     match = TILE_RE.fullmatch(path.name)
     if match is None:
         raise ValueError(f"invalid tile filename: {path.name}")
@@ -61,7 +101,23 @@ def _tile_row_col(path: Path) -> tuple[int, int]:
 
 
 def _open_tile(path: Path):
-    """Open a tile or raise a useful error."""
+    """Open one prepared tile through a consistent error boundary.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Raster to open read-only.
+
+    Returns
+    -------
+    osgeo.gdal.Dataset
+        Open dataset owned by the caller.
+
+    Raises
+    ------
+    RuntimeError
+        If GDAL cannot open the tile.
+    """
     dataset = gdal.Open(str(path))
     if dataset is None:
         raise RuntimeError(f"could not open tile: {path}")
@@ -74,6 +130,25 @@ def tile_footprints(tiles: list[Path]) -> tuple[np.ndarray, str]:
     Bounds are calculated from one reference tile and the row/column encoded
     in every filename. A sample is opened to verify that the tiles really do
     form the expected uniform, north-up lattice.
+
+    Parameters
+    ----------
+    tiles : list of pathlib.Path
+        Sorted prepared tiles following the row/column filename convention.
+
+    Returns
+    -------
+    tuple
+        Float64 ``[n_tiles, 4]`` bounds in left/bottom/right/top order and the
+        shared CRS WKT.
+
+    Raises
+    ------
+    ValueError
+        If the list is empty, filenames are invalid, CRS/grid is unsuitable,
+        or sampled tiles do not follow the inferred lattice.
+    RuntimeError
+        If GDAL cannot open a sampled tile.
     """
     if not tiles:
         raise ValueError("at least one tile is required")
@@ -135,7 +210,31 @@ def ecoregion_geometry(
     code_field: str,
     tile_crs: str,
 ):
-    """Load one ecoregion, union its features, and project it to the tile CRS."""
+    """Select, dissolve, and project one ecoregion polygon to tile space.
+
+    Parameters
+    ----------
+    shapefile : pathlib.Path
+        Ecoregion vector dataset.
+    code : str
+        Region code to select.
+    code_field : str
+        Attribute column holding the codes.
+    tile_crs : str
+        Destination CRS WKT shared by prepared tiles.
+
+    Returns
+    -------
+    shapely geometry
+        Non-empty union of all selected features in ``tile_crs``.
+
+    Raises
+    ------
+    SystemExit
+        If the shapefile/field/CRS/code is missing or geometry is empty.
+    OSError, ValueError
+        Propagated by GeoPandas for unreadable vectors or reprojection failure.
+    """
     if not shapefile.is_file():
         raise SystemExit(f"ecoregion shapefile not found: {shapefile}")
 
@@ -166,7 +265,25 @@ def ecoregion_geometry(
 
 
 def _intersecting_indices(footprints: list, geometry) -> set[int]:
-    """Return footprint indices that intersect geometry."""
+    """Query tile footprints intersecting an ecoregion across Shapely versions.
+
+    Parameters
+    ----------
+    footprints : list of shapely geometry
+        Tile boxes in the same CRS as ``geometry``.
+    geometry : shapely geometry
+        Dissolved ecoregion polygon.
+
+    Returns
+    -------
+    set of int
+        Indices of footprints that touch or overlap the region.
+
+    Raises
+    ------
+    ValueError
+        Propagated if geometries are invalid for spatial indexing/predicates.
+    """
     tree = STRtree(footprints)
     try:
         return set(tree.query(geometry, predicate="intersects").tolist())
@@ -188,7 +305,38 @@ def prune(
     manifest: Path,
     apply: bool,
 ) -> PruneReport:
-    """Find and optionally delete tiles that do not touch the ecoregion."""
+    """Identify and optionally delete prepared tiles outside one ecoregion.
+
+    Parameters
+    ----------
+    tiles_root : pathlib.Path
+        Directory containing ``tile_r*_c*.tif`` files.
+    ecoregion : str
+        Code selected from the shapefile.
+    shapefile : pathlib.Path
+        Ecoregion polygons.
+    code_field : str
+        Attribute field containing ``ecoregion``.
+    manifest : pathlib.Path
+        Atomic newline-delimited record of tiles selected for deletion.
+    apply : bool
+        Delete listed files when true; otherwise perform a dry run.
+
+    Returns
+    -------
+    PruneReport
+        Counts, byte total, and whether deletion was applied.
+
+    Raises
+    ------
+    SystemExit
+        If no tiles exist, the ecoregion is invalid, or every tile would be
+        deleted (a safety refusal).
+    ValueError, RuntimeError
+        If filenames/grid/geometry or GDAL reads are invalid.
+    OSError
+        If metadata, manifest publication, or deletion fails.
+    """
     tiles = sorted(tiles_root.glob("tile_r*_c*.tif"))
     if not tiles:
         raise SystemExit(f"no tile_r*_c*.tif files under {tiles_root}")
@@ -207,10 +355,17 @@ def prune(
 
     bytes_removed = sum(tile.stat().st_size for tile in remove)
     manifest.parent.mkdir(parents=True, exist_ok=True)
-    manifest.write_text(
-        "".join(f"{tile}\n" for tile in remove),
-        encoding="utf-8",
-    )
+    temporary = manifest.with_suffix(manifest.suffix + ".tmp")
+    temporary.unlink(missing_ok=True)
+    try:
+        temporary.write_text(
+            "".join(f"{tile}\n" for tile in remove),
+            encoding="utf-8",
+        )
+        os.replace(temporary, manifest)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
 
     if apply:
         for tile in remove:
@@ -226,7 +381,23 @@ def prune(
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse command-line arguments."""
+    """Parse ecoregion tile-pruning options.
+
+    Parameters
+    ----------
+    argv : list of str or None, optional
+        Explicit arguments; ``None`` reads process arguments.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed tile root, ecoregion selection, manifest, and apply flag.
+
+    Raises
+    ------
+    SystemExit
+        Raised by ``argparse`` for invalid options or ``--help``.
+    """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--tiles-root",
@@ -242,8 +413,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--shapefile",
         type=Path,
-        default=DEFAULT_SHAPEFILE,
-        help=f"ecoregion shapefile (default: {DEFAULT_SHAPEFILE})",
+        help="ecoregion shapefile (default: downloaded CEC Level III file)",
     )
     parser.add_argument(
         "--code-field",
@@ -264,13 +434,35 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Prune one prepared-tile directory."""
+    """Resolve the Level III shapefile and run safe tile pruning.
+
+    Parameters
+    ----------
+    argv : list of str or None, optional
+        Command-line arguments forwarded to :func:`parse_args`.
+
+    Returns
+    -------
+    None
+        A deletion manifest and summary are always written; tiles are deleted
+        only with ``--apply``.
+
+    Raises
+    ------
+    FileNotFoundError
+        If automatic shapefile discovery finds no downloaded Level III data.
+    SystemExit
+        If tile/ecoregion validation triggers a safety refusal.
+    ValueError, RuntimeError, OSError
+        If raster/vector processing, manifest writing, or deletion fails.
+    """
     args = parse_args(argv)
     manifest = args.manifest or Path(f"prune_{args.ecoregion}.txt")
+    shapefile = args.shapefile or find_shapefile(DEFAULT_SHAPEFILES_ROOT, 3)
     report = prune(
         args.tiles_root,
         args.ecoregion,
-        args.shapefile,
+        shapefile,
         args.code_field,
         manifest,
         args.apply,

@@ -23,7 +23,21 @@ gdal.UseExceptions()
 
 @dataclass(frozen=True)
 class AlignedTerrain:
-    """An aligned terrain mosaic and the grid needed for windowed reads."""
+    """Describe an aligned terrain mosaic for zero-resampling window reads.
+
+    Attributes
+    ----------
+    path : pathlib.Path
+        On-disk aligned multi-band terrain GeoTIFF.
+    gt : tuple of float
+        Six-element GDAL affine geotransform.
+    width, height : int
+        Mosaic dimensions in pixels.
+    n_bands : int
+        Number of terrain channels.
+    nodata : float or None
+        Common band nodata recorded on the aligned mosaic.
+    """
 
     path: Path
     gt: tuple[float, float, float, float, float, float]
@@ -38,7 +52,27 @@ def resolve_terrain_for_tile(
     terrain_path: Path | None,
     terrain_map: dict[str, Path] | None = None,
 ) -> Path | None:
-    """Resolve the terrain stack associated with a tile path."""
+    """Resolve the region-specific or shared terrain stack for a tile.
+
+    Parameters
+    ----------
+    tile_path : pathlib.Path
+        Prepared tile whose path components may contain a region name.
+    terrain_path : pathlib.Path or None
+        Shared fallback stack.
+    terrain_map : dict of str to pathlib.Path or None, optional
+        Region-name mapping checked before the shared fallback.
+
+    Returns
+    -------
+    pathlib.Path or None
+        Matching mapped stack, shared stack, or ``None`` when terrain is
+        disabled/unresolved.
+
+    Notes
+    -----
+    Region comparisons are case-insensitive and normalize spaces to underscores.
+    """
     if terrain_map:
         components = {
             component.lower().replace(" ", "_")
@@ -51,7 +85,27 @@ def resolve_terrain_for_tile(
 
 
 def _temporary_path(parent: Path, suffix: str) -> Path:
-    """Reserve a unique path without leaving an open or existing file."""
+    """Create a race-resistant unused pathname in a destination directory.
+
+    Parameters
+    ----------
+    parent : pathlib.Path
+        Existing directory that will contain the eventual temporary output.
+    suffix : str
+        Filename suffix used for GDAL driver inference.
+
+    Returns
+    -------
+    pathlib.Path
+        Unique path whose reservation file has been closed and removed.
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``parent`` does not exist.
+    OSError
+        If a temporary file cannot be reserved, closed, or removed.
+    """
     descriptor, name = tempfile.mkstemp(
         dir=parent,
         prefix=".terrain_",
@@ -66,7 +120,29 @@ def _temporary_path(parent: Path, suffix: str) -> Path:
 def _tile_grid_vrt(
     tile_paths: Sequence[Path],
 ) -> tuple[Path, tuple[float, ...], str, int, int]:
-    """Build a temporary VRT defining the tiles' common mosaic grid."""
+    """Mosaic tile headers into a temporary VRT defining their common grid.
+
+    Parameters
+    ----------
+    tile_paths : sequence of pathlib.Path
+        Prepared HLS tiles assigned to one terrain source.
+
+    Returns
+    -------
+    tuple
+        Temporary VRT path, affine transform, projection WKT, width, and height.
+        The caller owns and must remove the returned VRT.
+
+    Raises
+    ------
+    ValueError
+        If no tiles are supplied or the resulting grid lacks a CRS, is rotated,
+        or is not north-up.
+    RuntimeError
+        If GDAL cannot construct the VRT.
+    OSError
+        If temporary-file allocation or cleanup fails.
+    """
     if not tile_paths:
         raise ValueError("at least one tile is required to define a terrain grid")
 
@@ -101,7 +177,25 @@ def _tile_grid_vrt(
 def _source_metadata(
     terrain_path: Path,
 ) -> tuple[int, float | None, list[str]]:
-    """Read terrain band count, common nodata, and descriptions."""
+    """Read and validate metadata shared by a terrain stack's bands.
+
+    Parameters
+    ----------
+    terrain_path : pathlib.Path
+        Source multi-band terrain GeoTIFF.
+
+    Returns
+    -------
+    tuple
+        Band count, common nodata value (or ``None``), and band descriptions.
+
+    Raises
+    ------
+    RuntimeError
+        If GDAL cannot open the terrain stack.
+    ValueError
+        If it has no bands or bands use inconsistent nodata declarations.
+    """
     source = gdal.Open(str(terrain_path))
     if source is None:
         raise RuntimeError(f"Could not open terrain stack: {terrain_path}")
@@ -143,7 +237,28 @@ def _matches_grid(
     height: int,
     bands: int,
 ) -> bool:
-    """Return whether an existing mosaic can be safely reused."""
+    """Check whether an existing aligned mosaic exactly matches a target grid.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Candidate aligned raster.
+    transform : tuple of float
+        Expected affine transform.
+    projection : str
+        Expected CRS WKT.
+    width, height, bands : int
+        Expected raster dimensions and channel count.
+
+    Returns
+    -------
+    bool
+        True only when every reuse-critical metadata field matches exactly.
+
+    Notes
+    -----
+    Unreadable or missing candidates return false instead of raising.
+    """
     dataset = gdal.Open(str(path))
     if dataset is None:
         return False
@@ -160,7 +275,23 @@ def _matches_grid(
 
 
 def _aligned_metadata(path: Path) -> AlignedTerrain:
-    """Read an aligned terrain record from disk."""
+    """Materialize an :class:`AlignedTerrain` record from a raster header.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Existing aligned terrain GeoTIFF.
+
+    Returns
+    -------
+    AlignedTerrain
+        Grid, band count, and nodata needed by window readers.
+
+    Raises
+    ------
+    RuntimeError
+        If GDAL cannot open the raster.
+    """
     dataset = gdal.Open(str(path))
     if dataset is None:
         raise RuntimeError(f"Could not open aligned terrain: {path}")
@@ -182,7 +313,33 @@ def build_aligned_terrain(
     tile_paths: Sequence[Path],
     out_path: Path,
 ) -> AlignedTerrain:
-    """Warp one terrain stack onto the common grid of its prepared tiles."""
+    """Warp one terrain stack once onto the mosaic grid of its HLS tiles.
+
+    Parameters
+    ----------
+    terrain_path : pathlib.Path
+        Source multi-band terrain stack.
+    tile_paths : sequence of pathlib.Path
+        Prepared tiles that consume this terrain source.
+    out_path : pathlib.Path
+        Cached aligned GeoTIFF destination.
+
+    Returns
+    -------
+    AlignedTerrain
+        Metadata for the reused or newly written aligned mosaic.
+
+    Raises
+    ------
+    FileNotFoundError
+        If the terrain source is missing.
+    ValueError
+        If terrain metadata or the prepared-tile grid is invalid.
+    RuntimeError
+        If GDAL cannot build the tile VRT, warp terrain, or reopen output.
+    OSError
+        If temporary/output files cannot be created or atomically replaced.
+    """
     terrain_path = terrain_path.resolve()
     if not terrain_path.is_file():
         raise FileNotFoundError(f"terrain stack not found: {terrain_path}")
@@ -272,7 +429,33 @@ def build_aligned_terrain_map(
     tile_paths: Sequence[Path],
     out_dir: Path,
 ) -> dict[Path, AlignedTerrain]:
-    """Build one aligned mosaic per distinct terrain stack used by the tiles."""
+    """Group tiles by terrain source and build one aligned cache per source.
+
+    Parameters
+    ----------
+    terrain_path : pathlib.Path or None
+        Shared terrain stack fallback.
+    terrain_map : dict of str to pathlib.Path or None
+        Optional region-specific stack mapping.
+    tile_paths : sequence of pathlib.Path
+        Prepared tiles to resolve and group.
+    out_dir : pathlib.Path
+        Directory for reusable aligned mosaics.
+
+    Returns
+    -------
+    dict of pathlib.Path to AlignedTerrain
+        Resolved source stacks mapped to their aligned records.
+
+    Raises
+    ------
+    FileNotFoundError
+        If a resolved terrain stack is missing.
+    ValueError
+        If mappings leave tiles unresolved or output names collide.
+    RuntimeError
+        If an individual aligned mosaic cannot be produced.
+    """
     groups: dict[Path, list[Path]] = {}
     unresolved = []
     for tile in tile_paths:
@@ -318,7 +501,30 @@ def read_terrain_window(
     tile_w: int,
     tile_h: int,
 ) -> np.ndarray:
-    """Read an aligned terrain window as [bands, height, width] float32."""
+    """Read terrain matching one tile without performing another resample.
+
+    Parameters
+    ----------
+    aligned : AlignedTerrain
+        Pre-warped terrain mosaic and grid metadata.
+    tile_gt : tuple of float
+        Six-element tile affine transform.
+    tile_w, tile_h : int
+        Requested tile dimensions.
+
+    Returns
+    -------
+    numpy.ndarray
+        Float32 ``[bands, tile_h, tile_w]`` array with out-of-coverage and
+        nodata pixels represented by NaN.
+
+    Raises
+    ------
+    ValueError
+        If tile resolution/origin does not align with the terrain grid.
+    RuntimeError
+        If GDAL cannot open/read the mosaic or returns an unexpected shape.
+    """
     tolerance = max(abs(aligned.gt[1]), abs(aligned.gt[5])) * 1e-6
     if (
         not np.allclose(tile_gt[1:3], aligned.gt[1:3], atol=tolerance, rtol=0)
@@ -389,7 +595,25 @@ def warp_terrain_to_tile(
     terrain_path: Path,
     tile_path: Path,
 ) -> np.ndarray:
-    """Warp terrain directly to one tile grid as a slower fallback."""
+    """Warp terrain directly onto one tile as an uncached fallback.
+
+    Parameters
+    ----------
+    terrain_path : pathlib.Path
+        Multi-band terrain source.
+    tile_path : pathlib.Path
+        Prepared tile defining output bounds, dimensions, and CRS.
+
+    Returns
+    -------
+    numpy.ndarray
+        Float32 channels-first terrain data with nodata converted to NaN.
+
+    Raises
+    ------
+    RuntimeError
+        If GDAL cannot open inputs, warp, or read the in-memory result.
+    """
     tile = gdal.Open(str(tile_path))
     if tile is None:
         raise RuntimeError(f"Could not open tile: {tile_path}")
@@ -435,7 +659,10 @@ def warp_terrain_to_tile(
         warped = None
     finally:
         source = None
-        gdal.Unlink(memory_path)
+        try:
+            gdal.Unlink(memory_path)
+        except RuntimeError:
+            pass
 
     data = data.astype(np.float32)
     if data.ndim == 2:
@@ -448,7 +675,26 @@ def warp_terrain_to_tile(
 
 
 def find_tiles(roots: Sequence[Path]) -> list[Path]:
-    """Find sorted, deduplicated prepared tiles below one or more roots."""
+    """Find sorted, deduplicated prepared tiles below validated roots.
+
+    Parameters
+    ----------
+    roots : sequence of pathlib.Path
+        Directories searched recursively for ``tile_*.tif``.
+
+    Returns
+    -------
+    list of pathlib.Path
+        Absolute prepared-tile paths in deterministic order.
+
+    Raises
+    ------
+    FileNotFoundError
+        If any root is missing or no matching tiles are found.
+    """
+    missing = [root for root in roots if not root.is_dir()]
+    if missing:
+        raise FileNotFoundError(f"tile root(s) not found: {missing}")
     tiles = {
         tile.resolve()
         for root in roots
@@ -463,7 +709,24 @@ def find_tiles(roots: Sequence[Path]) -> list[Path]:
 
 
 def _read_terrain_map(path: Path) -> dict[str, Path]:
-    """Read and validate a region-to-terrain JSON mapping."""
+    """Read a JSON object mapping region labels to terrain-stack paths.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Mapping JSON file.
+
+    Returns
+    -------
+    dict of str to pathlib.Path
+        Validated mapping with path values converted to ``Path`` objects.
+
+    Raises
+    ------
+    SystemExit
+        If the file is unreadable, invalid JSON, or not a string-to-string
+        object.
+    """
     try:
         value = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError) as exc:
@@ -479,7 +742,23 @@ def _read_terrain_map(path: Path) -> dict[str, Path]:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse command-line arguments."""
+    """Parse aligned-terrain cache options.
+
+    Parameters
+    ----------
+    argv : list of str or None, optional
+        Explicit arguments; ``None`` reads process arguments.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed tile roots, terrain source/mapping, and output directory.
+
+    Raises
+    ------
+    SystemExit
+        Raised by ``argparse`` for invalid options or ``--help``.
+    """
     parser = argparse.ArgumentParser(
         description=__doc__.splitlines()[0],
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
@@ -510,7 +789,29 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Pre-warp every terrain stack used by a prepared-tile set."""
+    """Build all terrain caches required by a prepared-tile collection.
+
+    Parameters
+    ----------
+    argv : list of str or None, optional
+        Command-line arguments forwarded to :func:`parse_args`.
+
+    Returns
+    -------
+    None
+        Aligned GeoTIFFs and a summary are written as side effects.
+
+    Raises
+    ------
+    SystemExit
+        If roots are empty, mapping JSON is invalid, or no stack resolves.
+    FileNotFoundError
+        If tiles or terrain stacks are missing.
+    ValueError
+        If grids, nodata metadata, mappings, or output names are invalid.
+    RuntimeError
+        If GDAL cannot create an aligned cache.
+    """
     args = parse_args(argv)
     roots = [
         Path(value.strip())

@@ -60,7 +60,23 @@ BAND_RE = re.compile(
 
 
 def _nanmedian(stack: np.ndarray) -> np.ndarray:
-    """Return the per-pixel median, suppressing expected all-NaN warnings."""
+    """Compute a temporal per-pixel median without noisy empty-pixel warnings.
+
+    Parameters
+    ----------
+    stack : numpy.ndarray
+        Scene stack whose first axis is reduced; invalid observations are NaN.
+
+    Returns
+    -------
+    numpy.ndarray
+        Median image, with NaN where every scene is invalid.
+
+    Raises
+    ------
+    TypeError
+        Propagated by NumPy for unsupported input dtypes.
+    """
     with warnings.catch_warnings():
         warnings.filterwarnings(
             "ignore",
@@ -71,7 +87,22 @@ def _nanmedian(stack: np.ndarray) -> np.ndarray:
 
 
 def parse_date_from_name(path: Path) -> dt.date | None:
-    """Extract an HLS yyyyddd acquisition date from a filename."""
+    """Parse the first HLS ``yyyyddd`` acquisition token in a filename.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        HLS band file whose basename may contain a Julian day token.
+
+    Returns
+    -------
+    datetime.date or None
+        Valid acquisition date, or ``None`` for absent/malformed tokens.
+
+    Notes
+    -----
+    Parse errors are intentionally converted to ``None`` for discovery filters.
+    """
     match = DATE_RE.search(path.name)
     if not match:
         return None
@@ -85,7 +116,18 @@ def parse_date_from_name(path: Path) -> dt.date | None:
 
 
 def band_from_name(path: Path) -> str | None:
-    """Return the canonical HLS band name represented by path."""
+    """Extract a canonical HLS spectral-band name from a GeoTIFF basename.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Candidate file ending in ``.BXX.tif`` or ``.BXX.tiff``.
+
+    Returns
+    -------
+    str or None
+        Canonical band name, normalizing ``B08A`` to ``B8A``, or ``None``.
+    """
     match = BAND_RE.search(path.name)
     if not match:
         return None
@@ -99,7 +141,28 @@ def collect_files(
     end: dt.date | None,
     bands: tuple[str, ...] = DEFAULT_BANDS,
 ) -> dict[str, dict[str, list[Path]]]:
-    """Collect requested HLS band files as tile -> band -> paths."""
+    """Group requested HLS scenes by MGRS tile and spectral band.
+
+    Parameters
+    ----------
+    root : pathlib.Path
+        Raw HLS download tree searched recursively.
+    start, end : datetime.date or None
+        Inclusive acquisition-date limits. Files without parseable dates are
+        excluded whenever either limit is active.
+    bands : tuple of str, optional
+        Canonical bands to retain.
+
+    Returns
+    -------
+    dict
+        Nested ``tile -> band -> sorted scene paths`` mapping.
+
+    Raises
+    ------
+    OSError
+        If recursive directory enumeration fails.
+    """
     requested = set(bands)
     mapping: dict[str, dict[str, list[Path]]] = {}
     candidates = (
@@ -129,7 +192,23 @@ def collect_files(
 
 
 def block_windows(ds: gdal.Dataset) -> list[tuple[int, int, int, int]]:
-    """Split a dataset into native block windows clipped at its edges."""
+    """Cover a raster with edge-clipped native storage blocks.
+
+    Parameters
+    ----------
+    ds : osgeo.gdal.Dataset
+        Reference raster defining dimensions and preferred block size.
+
+    Returns
+    -------
+    list of tuple
+        ``(x_offset, y_offset, width, height)`` windows covering every pixel.
+
+    Raises
+    ------
+    RuntimeError
+        Propagated if GDAL cannot read band/block metadata.
+    """
     block_x, block_y = ds.GetRasterBand(1).GetBlockSize()
     if not block_x or not block_y:
         block_x, block_y = ds.RasterXSize, ds.RasterYSize
@@ -147,7 +226,24 @@ def block_windows(ds: gdal.Dataset) -> list[tuple[int, int, int, int]]:
 
 
 def open_dataset(path: Path, label: str = "dataset") -> gdal.Dataset | None:
-    """Open a raster, warning and returning None when it is unreadable."""
+    """Open a raster through a warning-based, nonfatal discovery boundary.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Raster to open read-only.
+    label : str, optional
+        Human-readable role used in warning messages.
+
+    Returns
+    -------
+    osgeo.gdal.Dataset or None
+        Open dataset, or ``None`` after reporting an unreadable source.
+
+    Notes
+    -----
+    GDAL open errors are deliberately caught so other scenes can still compose.
+    """
     try:
         dataset = gdal.Open(str(path))
     except RuntimeError as exc:
@@ -159,7 +255,23 @@ def open_dataset(path: Path, label: str = "dataset") -> gdal.Dataset | None:
 
 
 def infer_nodata(path: Path) -> float:
-    """Infer an output nodata value from a sample granule."""
+    """Choose an output nodata value compatible with a sample granule.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Representative single-band HLS GeoTIFF.
+
+    Returns
+    -------
+    float
+        Declared source nodata, NaN for undeclared floating data, or ``-9999``.
+
+    Raises
+    ------
+    RuntimeError
+        If the sample cannot be opened.
+    """
     dataset = open_dataset(path)
     if dataset is None:
         raise RuntimeError(f"Could not open {path}")
@@ -177,7 +289,18 @@ def infer_nodata(path: Path) -> float:
 
 
 def fmask_for_band(path: Path) -> Path | None:
-    """Return the Fmask raster accompanying a band file, if it exists."""
+    """Resolve the sidecar Fmask GeoTIFF corresponding to one HLS band.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Spectral-band path matching the module's HLS filename convention.
+
+    Returns
+    -------
+    pathlib.Path or None
+        Existing sidecar path, or ``None`` when absent/not derivable.
+    """
     candidate = path.with_name(BAND_RE.sub(f".Fmask{path.suffix}", path.name))
     return candidate if candidate != path and candidate.exists() else None
 
@@ -188,7 +311,30 @@ def fmask_clear_mask(
     valid_values: tuple[int, ...],
     invalid_bits: tuple[int, ...],
 ) -> np.ndarray:
-    """Return True for pixels accepted by the selected Fmask policy."""
+    """Convert an HLS Fmask window into a boolean clear-pixel mask.
+
+    Parameters
+    ----------
+    fmask : numpy.ndarray
+        QA values parallel to one spectral window.
+    mode : str
+        ``"values"`` for an allow-list or ``"bitmask"`` for invalid bits.
+    valid_values : tuple of int
+        Accepted classes in values mode.
+    invalid_bits : tuple of int
+        Bit positions rejected in bitmask mode; fill value 255 is always bad.
+
+    Returns
+    -------
+    numpy.ndarray
+        Boolean array where true pixels may contribute to the median.
+
+    Raises
+    ------
+    TypeError, ValueError
+        Propagated by NumPy if QA values cannot be converted or shapes/types are
+        unsuitable.
+    """
     if mode == "values":
         return np.isin(fmask, valid_values)
 
@@ -206,7 +352,24 @@ def _same_grid(
     geotransform: tuple[float, ...],
     projection: str,
 ) -> bool:
-    """Check that a scene can be read on the reference tile grid."""
+    """Check whether a scene exactly matches the reference tile grid.
+
+    Parameters
+    ----------
+    dataset : osgeo.gdal.Dataset
+        Candidate spectral or Fmask raster.
+    width, height : int
+        Expected pixel dimensions.
+    geotransform : tuple of float
+        Expected affine transform.
+    projection : str
+        Expected CRS WKT.
+
+    Returns
+    -------
+    bool
+        True only when size, transform, and projection all match exactly.
+    """
     return (
         dataset.RasterXSize == width
         and dataset.RasterYSize == height
@@ -221,7 +384,35 @@ def _read_window(
     label: str,
     warned: set[str],
 ) -> np.ndarray | None:
-    """Read one window, warning once per source when a read fails."""
+    """Read one band window while suppressing repeated source-level failures.
+
+    Parameters
+    ----------
+    dataset : osgeo.gdal.Dataset
+        Open single-band source.
+    window : tuple of int
+        ``(x_offset, y_offset, width, height)`` read request.
+    label : str
+        Human-readable source role for warnings.
+    warned : set of str
+        Mutable set tracking sources that have already emitted a warning.
+
+    Returns
+    -------
+    numpy.ndarray or None
+        Expected-shape array, or ``None`` after a reported read failure.
+
+    Raises
+    ------
+    RuntimeError
+        Propagated only when GDAL fails while identifying the dataset before
+        the guarded read; window read failures themselves return ``None``.
+
+    Notes
+    -----
+    GDAL ``RuntimeError`` is intentionally caught so other observations remain
+    usable.
+    """
     xoff, yoff, width, height = window
     source = dataset.GetDescription() or label
     try:
@@ -241,7 +432,25 @@ def _read_window(
 
 
 def _as_float(array: np.ndarray, nodata: float | None) -> np.ndarray:
-    """Convert a source window to float32 and replace invalid values with NaN."""
+    """Normalize a source window to float32 with NaN invalid pixels.
+
+    Parameters
+    ----------
+    array : numpy.ndarray
+        Source band window.
+    nodata : float or None
+        Declared source nodata, including NaN.
+
+    Returns
+    -------
+    numpy.ndarray
+        Independent float32 copy with non-finite/nodata pixels set to NaN.
+
+    Raises
+    ------
+    TypeError, ValueError
+        If NumPy cannot convert the input to float32.
+    """
     result = array.astype(np.float32, copy=True)
     invalid = ~np.isfinite(result)
     if nodata is not None:
@@ -254,7 +463,25 @@ def _find_reference(
     tile: str,
     bands_to_paths: dict[str, list[Path]],
 ) -> gdal.Dataset:
-    """Open the first readable scene for a tile."""
+    """Find a readable scene whose header defines one composite's grid.
+
+    Parameters
+    ----------
+    tile : str
+        MGRS tile identifier used in error reporting.
+    bands_to_paths : dict of str to list of pathlib.Path
+        Candidate scenes grouped by band.
+
+    Returns
+    -------
+    osgeo.gdal.Dataset
+        First readable source dataset; caller owns the handle.
+
+    Raises
+    ------
+    RuntimeError
+        If every candidate is unreadable.
+    """
     for paths in bands_to_paths.values():
         for path in paths:
             dataset = open_dataset(path, "reference scene")
@@ -275,7 +502,43 @@ def compute_tile(
     fallback_to_raw: bool,
     output_bands: tuple[str, ...] = DEFAULT_BANDS,
 ) -> tuple[Path, list[dict[str, Any]]]:
-    """Build one named, Fmask-filtered median composite."""
+    """Build one blockwise, named, Fmask-filtered HLS median composite.
+
+    Parameters
+    ----------
+    tile : str
+        MGRS tile identifier used for output naming.
+    bands_to_paths : dict
+        Requested band names mapped to temporal scene paths.
+    out_dir : pathlib.Path
+        Composite destination directory.
+    nodata_default : float
+        Output fill/nodata value.
+    use_fmask : bool
+        Apply QA masks when sidecars are available.
+    fmask_mode : {"bitmask", "values"}
+        QA interpretation policy.
+    clear_fmask_values, invalid_fmask_bits : tuple of int
+        Values-mode allow-list and bitmask-mode reject list.
+    fallback_to_raw : bool
+        Fill pixels with no clear observation from the unmasked median.
+    output_bands : tuple of str, optional
+        Output channel names and order; missing bands are filled with nodata.
+
+    Returns
+    -------
+    tuple
+        Published composite path and per-window diagnostic records.
+
+    Raises
+    ------
+    ValueError
+        If the tile has no source files or the reference lacks a CRS.
+    RuntimeError
+        If no reference/GTiff driver is available or GDAL cannot create/write.
+    OSError
+        If directories, temporary output, or atomic replacement fail.
+    """
     if not any(bands_to_paths.values()):
         raise ValueError(f"No files for tile {tile}")
 
@@ -285,6 +548,8 @@ def compute_tile(
     width, height = reference.RasterXSize, reference.RasterYSize
     windows = block_windows(reference)
     reference = None
+    if not projection:
+        raise ValueError(f"reference scene for {tile} has no CRS")
 
     out_dir.mkdir(parents=True, exist_ok=True)
     out_path = out_dir / f"{tile}_HLS_median_composite.tif"
@@ -481,7 +746,24 @@ def _task(
     fallback_to_raw: bool,
     output_bands: tuple[str, ...],
 ) -> tuple[Path, list[dict[str, Any]]]:
-    """Warn about missing model bands, then composite one tile."""
+    """Report missing bands and execute one process-pool-safe tile task.
+
+    Parameters
+    ----------
+    tile, bands, out_dir, nodata_default, use_fmask, fmask_mode,
+    clear_fmask_values, invalid_fmask_bits, fallback_to_raw, output_bands
+        Picklable arguments forwarded directly to :func:`compute_tile`.
+
+    Returns
+    -------
+    tuple
+        Composite path and diagnostic rows from :func:`compute_tile`.
+
+    Raises
+    ------
+    ValueError, RuntimeError, OSError
+        Propagated from :func:`compute_tile`.
+    """
     missing = [band for band in output_bands if band not in bands]
     if missing:
         print(f"[warn] {tile} missing bands {missing}; filling with nodata.", flush=True)
@@ -500,11 +782,33 @@ def _task(
 
 
 def _parse_int_list(value: str, label: str, maximum: int) -> tuple[int, ...]:
-    """Parse and validate a comma-separated integer option."""
+    """Parse a non-empty, bounded comma-separated integer CLI option.
+
+    Parameters
+    ----------
+    value : str
+        Raw comma-separated integers.
+    label : str
+        Option name included in errors.
+    maximum : int
+        Inclusive upper bound; zero is the lower bound.
+
+    Returns
+    -------
+    tuple of int
+        Parsed values in source order.
+
+    Raises
+    ------
+    SystemExit
+        If values are absent, noninteger, or outside ``0..maximum``.
+    """
     try:
         values = tuple(int(item.strip()) for item in value.split(",") if item.strip())
     except ValueError as exc:
         raise SystemExit(f"{label} must be a comma-separated list of integers") from exc
+    if not values:
+        raise SystemExit(f"{label} must contain at least one integer")
     invalid = [item for item in values if not 0 <= item <= maximum]
     if invalid:
         raise SystemExit(f"{label} values must be between 0 and {maximum}: {invalid}")
@@ -514,7 +818,23 @@ def _parse_int_list(value: str, label: str, maximum: int) -> tuple[int, ...]:
 def _summarize_diagnostics(
     rows: list[dict[str, Any]],
 ) -> list[dict[str, Any]]:
-    """Roll per-window diagnostics up to one row per tile and band."""
+    """Aggregate window diagnostics into one record per tile and band.
+
+    Parameters
+    ----------
+    rows : list of dict
+        Per-window records emitted by :func:`compute_tile`.
+
+    Returns
+    -------
+    list of dict
+        Sorted totals plus clear-observation and fallback fractions.
+
+    Raises
+    ------
+    KeyError
+        If a row does not follow the diagnostic schema.
+    """
     totals: dict[tuple[str, str], dict[str, Any]] = {}
     summed = (
         "raw_observation_count",
@@ -556,7 +876,27 @@ def _summarize_diagnostics(
 
 
 def write_diagnostics(rows: list[dict[str, Any]], path: Path) -> None:
-    """Write aggregated compositing diagnostics without external libraries."""
+    """Write aggregated compositing diagnostics as CSV.
+
+    Parameters
+    ----------
+    rows : list of dict
+        Per-window diagnostic rows; an empty list produces no file.
+    path : pathlib.Path
+        Destination CSV.
+
+    Returns
+    -------
+    None
+        The CSV is written as a side effect when rows exist.
+
+    Raises
+    ------
+    KeyError
+        If rows do not match the diagnostic schema.
+    OSError
+        If the directory or CSV cannot be created.
+    """
     summary = _summarize_diagnostics(rows)
     if not summary:
         return
@@ -568,7 +908,23 @@ def write_diagnostics(rows: list[dict[str, Any]], path: Path) -> None:
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
-    """Parse command-line arguments."""
+    """Parse monthly HLS compositing options.
+
+    Parameters
+    ----------
+    argv : list of str or None, optional
+        Explicit arguments; ``None`` reads process arguments.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed date, bands, nodata, Fmask, worker, and directory options.
+
+    Raises
+    ------
+    SystemExit
+        Raised by ``argparse`` for invalid options or ``--help``.
+    """
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
         "--input-root",
@@ -631,7 +987,27 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Composite every MGRS tile found below the input root."""
+    """Discover and composite every requested MGRS tile, then report QA.
+
+    Parameters
+    ----------
+    argv : list of str or None, optional
+        Command-line arguments forwarded to :func:`parse_args`.
+
+    Returns
+    -------
+    None
+        Per-tile composites and a diagnostics CSV are written as side effects.
+
+    Raises
+    ------
+    SystemExit
+        If dates, bands, Fmask policies, or discovery results are invalid.
+    ValueError, RuntimeError
+        If a reference/grid is invalid or GDAL cannot produce a tile.
+    OSError
+        If outputs or diagnostics cannot be written.
+    """
     args = parse_args(argv)
     start = dt.date.fromisoformat(args.start_date) if args.start_date else None
     end = dt.date.fromisoformat(args.end_date) if args.end_date else None

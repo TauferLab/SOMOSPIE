@@ -12,8 +12,9 @@ If the output already exists and --force is not set, the script is a no-op.
 from __future__ import annotations
 
 import argparse
+import os
 from pathlib import Path
-from typing import List
+from typing import List, Sequence
 
 import numpy as np
 import pandas as pd
@@ -28,21 +29,36 @@ gdal.UseExceptions()
 USE_XARRAY_IO = xr is not None
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """
     Parse command-line arguments for the monthly aggregation.
+
+    Parameters
+    ----------
+    argv : sequence of str or None, optional
+        Explicit arguments; ``None`` reads process arguments.
 
     Returns
     -------
     argparse.Namespace
         Parsed arguments. `output` is None unless given, in which case
         `main` derives it from `input_root` and `year`.
+
+    Raises
+    ------
+    SystemExit
+        Raised by ``argparse`` for invalid options or ``--help``.
     """
     parser = argparse.ArgumentParser(
         description="Aggregate ESA CCI daily soil-moisture NetCDFs into monthly mean CSV."
     )
     default_root = Path(__file__).resolve().parents[1] / "data" / "ESA_CCI"
-    parser.add_argument("--input-root", type=Path, default=default_root, help="Root directory containing year folders.")
+    parser.add_argument(
+        "--input-root",
+        type=Path,
+        default=default_root,
+        help="Root directory containing year folders.",
+    )
     parser.add_argument("--year", type=int, required=True, help="Year to process (e.g., 2019).")
     parser.add_argument(
         "--variable",
@@ -59,7 +75,7 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Recompute even if the output file already exists.",
     )
-    return parser.parse_args()
+    return parser.parse_args(argv)
 
 
 def month_files(year_dir: Path, year: int, month: int) -> List[Path]:
@@ -79,6 +95,11 @@ def month_files(year_dir: Path, year: int, month: int) -> List[Path]:
     -------
     list of pathlib.Path
         Matching files in sorted order; empty when the month has no data.
+
+    Raises
+    ------
+    OSError
+        If directory enumeration fails.
     """
     pattern = f"ESACCI-SOILMOISTURE-L3S-SSMV-COMBINED-{year}{month:02d}*.nc"
     return sorted(year_dir.glob(pattern))
@@ -99,6 +120,10 @@ def _nc_subdataset(path: Path, var: str) -> str:
     -------
     str
         A ``NETCDF:"<path>":<var>`` string accepted by `gdal.Open`.
+
+    Notes
+    -----
+    The function only formats an identifier and performs no filesystem access.
     """
     return f'NETCDF:"{path}":{var}'
 
@@ -129,7 +154,9 @@ def _load_grid_gdal(sample_file: Path, var: str) -> tuple[np.ndarray, np.ndarray
     """
     ds = gdal.Open(_nc_subdataset(sample_file, var))
     if ds is None:
-        raise RuntimeError(f"Could not open {sample_file} variable '{var}' with GDAL.")
+        raise RuntimeError(
+            f"Could not open {sample_file} variable '{var}' with GDAL."
+        )
     gt = ds.GetGeoTransform()
     width, height = ds.RasterXSize, ds.RasterYSize
     cols = np.arange(width, dtype="float64") + 0.5
@@ -194,6 +221,12 @@ def load_grid(sample_file: Path, var: str) -> tuple[np.ndarray, np.ndarray]:
     -------
     tuple of numpy.ndarray
         `(lon_grid, lat_grid)`, both shaped like the raster.
+
+    Raises
+    ------
+    RuntimeError
+        If xarray cannot supply coordinates and GDAL cannot open/read the
+        fallback variable.
     """
     global USE_XARRAY_IO
     if USE_XARRAY_IO:
@@ -208,7 +241,8 @@ def load_grid(sample_file: Path, var: str) -> tuple[np.ndarray, np.ndarray]:
         except Exception as exc:
             USE_XARRAY_IO = False
             print(
-                f"[warn] xarray backend unavailable for NetCDF read ({exc.__class__.__name__}: {exc}); "
+                f"[warn] xarray backend unavailable for NetCDF read "
+                f"({exc.__class__.__name__}: {exc}); "
                 "falling back to GDAL."
             )
     return _load_grid_gdal(sample_file, var=var)
@@ -233,6 +267,13 @@ def monthly_mean(files: List[Path], var: str) -> np.ndarray | None:
     -------
     numpy.ndarray or None
         Mean field shaped like the grid, or None when `files` is empty.
+
+    Raises
+    ------
+    RuntimeError
+        If xarray fails and GDAL cannot open/read a daily variable.
+    ValueError
+        If daily arrays have inconsistent shapes and cannot be stacked.
     """
     if not files:
         return None
@@ -250,7 +291,8 @@ def monthly_mean(files: List[Path], var: str) -> np.ndarray | None:
         except Exception as exc:
             USE_XARRAY_IO = False
             print(
-                f"[warn] xarray backend unavailable for NetCDF read ({exc.__class__.__name__}: {exc}); "
+                f"[warn] xarray backend unavailable for NetCDF read "
+                f"({exc.__class__.__name__}: {exc}); "
                 "falling back to GDAL."
             )
 
@@ -309,18 +351,32 @@ def build_monthly_df(year_dir: Path, year: int, var: str) -> pd.DataFrame:
     return base
 
 
-def main() -> None:
+def main(argv: Sequence[str] | None = None) -> None:
     """
     Aggregate one year of ESA CCI dailies into a monthly mean CSV.
 
     A no-op when the output already exists and ``--force`` was not passed.
 
+    Parameters
+    ----------
+    argv : sequence of str or None, optional
+        Command-line arguments forwarded to :func:`parse_args`.
+
+    Returns
+    -------
+    None
+        A wide monthly CSV and status message are produced as side effects.
+
     Raises
     ------
     FileNotFoundError
         If the expected ``<input_root>/<year>`` directory is missing.
+    RuntimeError, ValueError
+        If NetCDF variables cannot be read or monthly grids are inconsistent.
+    OSError
+        If the output directory, temporary CSV, or atomic replacement fails.
     """
-    args = parse_args()
+    args = parse_args(argv)
     output = args.output or (args.input_root / f"{args.year}_ESA_monthly.csv")
     year_dir = args.input_root / str(args.year)
 
@@ -332,7 +388,14 @@ def main() -> None:
 
     df = build_monthly_df(year_dir, args.year, args.variable)
     output.parent.mkdir(parents=True, exist_ok=True)
-    df.to_csv(output, index=False)
+    temporary = output.with_suffix(output.suffix + ".tmp")
+    temporary.unlink(missing_ok=True)
+    try:
+        df.to_csv(temporary, index=False)
+        os.replace(temporary, output)
+    except Exception:
+        temporary.unlink(missing_ok=True)
+        raise
     print(f"Wrote monthly means to {output}")
 
 

@@ -58,6 +58,15 @@ def find_rasters(in_dir: Path) -> Iterable[Path]:
     ------
     pathlib.Path
         Each ``.tif`` or ``.tiff`` file found.
+
+    Raises
+    ------
+    FileNotFoundError
+        If ``in_dir`` does not exist.
+    NotADirectoryError
+        If ``in_dir`` is not a directory.
+    OSError
+        If directory enumeration fails.
     """
     for path in sorted(in_dir.iterdir()):
         if path.suffix.lower() in {".tif", ".tiff"} and path.is_file():
@@ -81,6 +90,10 @@ def build_output_path(out_dir: Path, src_path: Path, suffix: str = "_reproj") ->
     -------
     pathlib.Path
         ``<out_dir>/<stem><suffix>.tif``.
+
+    Notes
+    -----
+    This helper only constructs a path and performs no filesystem access.
     """
     stem = src_path.stem
     return out_dir / f"{stem}{suffix}.tif"
@@ -123,6 +136,10 @@ def reproject_file(
         If `src_path` cannot be opened.
     ValueError
         If the source declares no CRS, leaving nothing to reproject from.
+    RuntimeError
+        If GDAL cannot warp or reopen the output.
+    OSError
+        If the output directory, temporary file, or atomic replacement fails.
     """
     src = gdal.Open(str(src_path))
     if src is None:
@@ -130,29 +147,55 @@ def reproject_file(
     if src.GetProjectionRef() in ("", None):
         raise ValueError(f"{src_path} has no CRS; cannot reproject.")
 
-    nodata = src.GetRasterBand(1).GetNoDataValue()
-    out_path.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        nodata = src.GetRasterBand(1).GetNoDataValue()
+        descriptions = [
+            src.GetRasterBand(index).GetDescription()
+            for index in range(1, src.RasterCount + 1)
+        ]
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = out_path.with_suffix(out_path.suffix + ".tmp")
+        temporary.unlink(missing_ok=True)
+        warp_opts = gdal.WarpOptions(
+            format="GTiff",
+            dstSRS=dst_crs,
+            resampleAlg=resampling_alg,
+            srcNodata=nodata,
+            dstNodata=nodata,
+            multithread=True,
+            creationOptions=["COMPRESS=ZSTD", "ZSTD_LEVEL=1", "BIGTIFF=YES"],
+        )
 
-    warp_opts = gdal.WarpOptions(
-        dstSRS=dst_crs,
-        resampleAlg=resampling_alg,
-        srcNodata=nodata,
-        dstNodata=nodata,
-        multithread=True,
-        creationOptions=["COMPRESS=ZSTD", "ZSTD_LEVEL=1", "BIGTIFF=YES"],
-    )
-
-    gdal.Warp(destNameOrDestDS=str(out_path), srcDSOrSrcDSTab=src, options=warp_opts)
+        warped = None
+        try:
+            warped = gdal.Warp(str(temporary), src, options=warp_opts)
+            if warped is None:
+                raise RuntimeError(f"GDAL could not reproject {src_path}")
+            for index, description in enumerate(descriptions, start=1):
+                if description:
+                    warped.GetRasterBand(index).SetDescription(description)
+            warped.FlushCache()
+            warped = None
+            os.replace(temporary, out_path)
+        except Exception:
+            warped = None
+            temporary.unlink(missing_ok=True)
+            raise
+    finally:
+        src = None
 
     out_ds = gdal.Open(str(out_path))
-    meta = {
-        "crs": dst_crs,
-        "width": out_ds.RasterXSize,
-        "height": out_ds.RasterYSize,
-        "count": out_ds.RasterCount,
-    }
-    out_ds = None
-
+    if out_ds is None:
+        raise RuntimeError(f"could not reopen reprojected raster: {out_path}")
+    try:
+        meta = {
+            "crs": out_ds.GetProjection(),
+            "width": out_ds.RasterXSize,
+            "height": out_ds.RasterYSize,
+            "count": out_ds.RasterCount,
+        }
+    finally:
+        out_ds = None
     return out_path, meta
 
 
@@ -169,9 +212,17 @@ def parse_args(argv=None):
     -------
     argparse.Namespace
         Parsed arguments. `workers` defaults to the CPU count.
+
+    Raises
+    ------
+    SystemExit
+        Raised by ``argparse`` for invalid options or ``--help``.
     """
     parser = argparse.ArgumentParser(
-        description="Reproject all GeoTIFFs in a directory to a target CRS, writing one output per input."
+        description=(
+            "Reproject every GeoTIFF in a directory to a target CRS, "
+            "writing one output per input."
+        )
     )
     parser.add_argument("input_dir", help="Directory containing input rasters (.tif/.tiff).")
     parser.add_argument("output_dir", help="Directory to write reprojected rasters.")
@@ -211,10 +262,21 @@ def main(argv=None):
     argv : list of str, optional
         Argument vector to parse. Defaults to `sys.argv`.
 
+    Returns
+    -------
+    None
+        Reprojected rasters and progress messages are produced as side effects.
+
     Raises
     ------
     FileNotFoundError
         If the input directory is missing or holds no rasters.
+    ValueError
+        If output names collide or a source lacks a CRS.
+    RuntimeError
+        If GDAL cannot reproject or reopen an output.
+    OSError
+        If output publication fails.
     """
     args = parse_args(argv)
     in_dir = Path(args.input_dir)
@@ -227,9 +289,17 @@ def main(argv=None):
     rasters = list(find_rasters(in_dir))
     if not rasters:
         raise FileNotFoundError(f"No .tif/.tiff files found in {in_dir}")
+    output_paths = [build_output_path(out_dir, path) for path in rasters]
+    if len(set(output_paths)) != len(output_paths):
+        raise ValueError(
+            "input rasters with identical stems would overwrite one output"
+        )
 
     workers = max(1, int(args.workers))
-    print(f"Reprojecting {len(rasters)} rasters from {in_dir} -> {out_dir} ({args.dst_crs}) using {workers} worker(s)")
+    print(
+        f"Reprojecting {len(rasters)} rasters from {in_dir} -> {out_dir} "
+        f"({args.dst_crs}) using {workers} worker(s)"
+    )
 
     outputs = []
     if workers == 1:
@@ -270,12 +340,19 @@ def show_quicklook(path: Path):
     path : pathlib.Path
         Raster to display.
 
+    Returns
+    -------
+    None
+        A blocking Matplotlib window is displayed.
+
     Raises
     ------
     FileNotFoundError
         If the raster cannot be opened.
     RuntimeError
         If the raster opens but no data can be read from it.
+    ImportError
+        If optional NumPy or Matplotlib dependencies are unavailable.
     """
     import matplotlib.pyplot as plt
     import numpy as np

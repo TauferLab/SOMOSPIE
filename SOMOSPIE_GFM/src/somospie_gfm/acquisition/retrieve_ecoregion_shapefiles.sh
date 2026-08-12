@@ -9,9 +9,10 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 OUTPUT_DIR="${1:-${PROJECT_ROOT}/resources/shapefiles}"
 
-LEVEL_1_URL="https://www.cec.org/wp-content/uploads/wpallimport/files/Atlas/Files/Terrestrial_Ecoregions_L1/NA_Terrestrial_Ecoregions_Level_I_Shapefile.zip"
-LEVEL_2_URL="https://www.cec.org/wp-content/uploads/wpallimport/files/Atlas/Files/Terrestrial_Ecoregions_L2/NA_Terrestrial_Ecoregions_Level_II_Shapefile.zip"
-LEVEL_3_URL="https://www.cec.org/wp-content/uploads/wpallimport/files/Atlas/Files/Terrestrial_Ecoregions_L3/NA_Terrestrial_Ecoregions_v2_Level_III_Shapefile.zip"
+CEC_ATLAS_URL="https://www.cec.org/files/atlas_layers/1_terrestrial_ecosystems"
+LEVEL_1_URL="${CEC_ATLAS_URL}/1_06_1_terr_ecoregions_i/terr_ecoregions_v2_level_i_shapefile.zip"
+LEVEL_2_URL="${CEC_ATLAS_URL}/1_06_2_terr_ecoregions_ii/terr_ecoregions_v2_level_ii_shapefile.zip"
+LEVEL_3_URL="${CEC_ATLAS_URL}/1_06_3_terr_ecoregions_iii/terr_ecoregions_v2_level_iii_shapefile.zip"
 
 if ! command -v unzip >/dev/null 2>&1; then
     echo "unzip is required" >&2

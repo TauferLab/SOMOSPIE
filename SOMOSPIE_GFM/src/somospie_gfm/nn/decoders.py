@@ -79,6 +79,29 @@ class PatchUpsampleDecoder(nn.Module):
         dropout: float,
         output_size: int = 0,
     ) -> None:
+        """Initialize the normalized scalar projection and output geometry.
+
+        Parameters
+        ----------
+        embed_dim : int
+            Backbone feature channels.
+        tile_size : int
+            Input tile width and height.
+        dropout : float
+            Channel-dropout probability in ``[0, 1)``.
+        output_size : int, optional
+            Dense output dimension; zero selects ``tile_size``.
+
+        Returns
+        -------
+        None
+            Decoder layers are initialized in place.
+
+        Raises
+        ------
+        ValueError
+            If feature/output dimensions or dropout are invalid.
+        """
         super().__init__()
         if embed_dim <= 0:
             raise ValueError("embed_dim must be positive")
@@ -93,6 +116,11 @@ class PatchUpsampleDecoder(nn.Module):
 
     def forward(self, features: torch.Tensor) -> torch.Tensor:
         """Decode one ``[B, E, h, w]`` patch-feature map.
+
+        Parameters
+        ----------
+        features : torch.Tensor
+            Four-dimensional backbone feature map.
 
         Returns
         -------
@@ -151,6 +179,33 @@ class ConvUpsampleDecoder(nn.Module):
         dropout: float,
         output_size: int = 0,
     ) -> None:
+        """Initialize the learned multistage convolutional upsampler.
+
+        Parameters
+        ----------
+        embed_dim : int
+            Backbone feature channels.
+        tile_size : int
+            Input tile width and height.
+        patch_grid_size : int
+            Width and height of the patch-token grid.
+        channels : int
+            Decoder hidden width.
+        dropout : float
+            Spatial-dropout probability in ``[0, 1)``.
+        output_size : int, optional
+            Dense output dimension; zero selects ``tile_size``.
+
+        Returns
+        -------
+        None
+            Decoder layers are initialized in place.
+
+        Raises
+        ------
+        ValueError
+            If dimensions or dropout are invalid.
+        """
         super().__init__()
         if min(embed_dim, patch_grid_size, channels) <= 0:
             raise ValueError("embed_dim, patch_grid_size, and channels must be positive")
@@ -181,6 +236,16 @@ class ConvUpsampleDecoder(nn.Module):
     def forward(self, features: torch.Tensor) -> torch.Tensor:
         """Decode one patch-feature map to ``[batch, height, width]``.
 
+        Parameters
+        ----------
+        features : torch.Tensor
+            Four-dimensional ``[B, E, h, w]`` backbone feature map.
+
+        Returns
+        -------
+        torch.Tensor
+            Dense ``[B, output_size, output_size]`` predictions.
+
         Raises
         ------
         ValueError
@@ -202,9 +267,40 @@ class ConvUpsampleDecoder(nn.Module):
 
 
 class PyramidPooling(nn.Module):
-    """Aggregate local and pooled context for the deepest feature map."""
+    """Aggregate local and multi-scale context for a deep feature map.
+
+    Parameters
+    ----------
+    in_channels : int
+        Channels in the source feature map.
+    out_channels : int
+        Channels emitted by the fused context map.
+
+    Raises
+    ------
+    ValueError, RuntimeError
+        Propagated by PyTorch if channel dimensions cannot construct valid
+        convolutional layers.
+    """
 
     def __init__(self, in_channels: int, out_channels: int) -> None:
+        """Initialize four adaptive-pooling branches and their fusion layer.
+
+        Parameters
+        ----------
+        in_channels, out_channels : int
+            Input and fused output channel counts.
+
+        Returns
+        -------
+        None
+            Pooling branches and convolutional fusion are initialized in place.
+
+        Raises
+        ------
+        ValueError, RuntimeError
+            Propagated by PyTorch for invalid channel dimensions.
+        """
         super().__init__()
         branch_channels = max(1, out_channels // 4)
         self.branches = nn.ModuleList(
@@ -226,7 +322,23 @@ class PyramidPooling(nn.Module):
         )
 
     def forward(self, features: torch.Tensor) -> torch.Tensor:
-        """Return context-enriched features at the input spatial size."""
+        """Return context-enriched features at the input spatial size.
+
+        Parameters
+        ----------
+        features : torch.Tensor
+            Four-dimensional ``[B, C, H, W]`` feature map.
+
+        Returns
+        -------
+        torch.Tensor
+            Fused ``[B, out_channels, H, W]`` context features.
+
+        Raises
+        ------
+        RuntimeError
+            If input rank/channels are incompatible with pooling or convolution.
+        """
         size = features.shape[-2:]
         pooled = [
             F.interpolate(branch(features), size=size, mode="bilinear", align_corners=False)
@@ -268,6 +380,36 @@ class UPerNetDecoder(nn.Module):
         output_size: int = 0,
         encoder_depth: int = 4,
     ) -> None:
+        """Initialize lateral projections, pyramid pooling, and dense head.
+
+        Parameters
+        ----------
+        embed_dim : int
+            Channels in every selected backbone feature map.
+        tile_size : int
+            Input tile width and height.
+        patch_grid_size : int
+            Accepted for decoder-factory compatibility; transformer feature
+            sizes are determined dynamically.
+        channels : int
+            Feature-pyramid hidden width.
+        dropout : float
+            Head dropout probability in ``[0, 1)``.
+        output_size : int, optional
+            Dense output dimension; zero selects ``tile_size``.
+        encoder_depth : int, optional
+            Number of backbone feature maps fused.
+
+        Returns
+        -------
+        None
+            Decoder layers are initialized in place.
+
+        Raises
+        ------
+        ValueError
+            If dimensions, depth, or dropout are invalid.
+        """
         super().__init__()
         del patch_grid_size
         if min(embed_dim, channels, encoder_depth) <= 0:
@@ -296,7 +438,23 @@ class UPerNetDecoder(nn.Module):
         )
 
     def _select(self, features: Sequence[torch.Tensor]) -> list[torch.Tensor]:
-        """Return exactly ``encoder_depth`` feature maps, repeating if needed."""
+        """Return exactly ``encoder_depth`` feature maps, repeating if needed.
+
+        Parameters
+        ----------
+        features : sequence of torch.Tensor
+            Backbone feature pyramid in shallow-to-deep order.
+
+        Returns
+        -------
+        list of torch.Tensor
+            Final maps, with the earliest selected map repeated when necessary.
+
+        Raises
+        ------
+        ValueError
+            If no feature maps are supplied.
+        """
         if not features:
             raise ValueError("UPerNetDecoder requires at least one feature map")
         selected = list(features[-self.encoder_depth :])
@@ -309,6 +467,16 @@ class UPerNetDecoder(nn.Module):
         features: torch.Tensor | Sequence[torch.Tensor],
     ) -> torch.Tensor:
         """Fuse feature maps and return dense ``[B, H, W]`` predictions.
+
+        Parameters
+        ----------
+        features : torch.Tensor or sequence of torch.Tensor
+            One feature map or a shallow-to-deep backbone feature pyramid.
+
+        Returns
+        -------
+        torch.Tensor
+            Dense ``[B, output_size, output_size]`` predictions.
 
         Raises
         ------

@@ -104,6 +104,8 @@ def reproject_file(
     out_path: Path,
     dst_crs: str,
     resampling_alg=gdal.GRA_Bilinear,
+    resolution: float | None = None,
+    target_aligned_pixels: bool = False,
 ) -> Tuple[Path, dict]:
     """
     Reproject a single raster to `dst_crs`, streaming through GDAL.Warp.
@@ -123,6 +125,11 @@ def reproject_file(
     resampling_alg : int, optional
         A GDAL ``GRA_*`` resampling constant, by default bilinear. CLI names
         are mapped to these by `RESAMPLING_MAP`.
+    resolution : float or None, optional
+        Positive target pixel size in destination-CRS units for both axes.
+    target_aligned_pixels : bool, optional
+        Snap output bounds to integer multiples of ``resolution``. This makes
+        independently warped rasters share one global pixel lattice.
 
     Returns
     -------
@@ -159,6 +166,9 @@ def reproject_file(
         warp_opts = gdal.WarpOptions(
             format="GTiff",
             dstSRS=dst_crs,
+            xRes=resolution,
+            yRes=resolution,
+            targetAlignedPixels=target_aligned_pixels,
             resampleAlg=resampling_alg,
             srcNodata=nodata,
             dstNodata=nodata,
@@ -246,6 +256,16 @@ def parse_args(argv=None):
         default=os.cpu_count() or 1,
         help="Number of parallel workers (processes) to use.",
     )
+    parser.add_argument(
+        "--resolution",
+        type=float,
+        help="target x/y pixel size in destination-CRS units",
+    )
+    parser.add_argument(
+        "--target-aligned-pixels",
+        action="store_true",
+        help="snap output bounds to the target resolution's global lattice",
+    )
     return parser.parse_args(argv)
 
 
@@ -283,6 +303,11 @@ def main(argv=None):
     out_dir = Path(args.output_dir)
     resampling_alg = RESAMPLING_MAP[args.resampling.lower()]
 
+    if args.resolution is not None and args.resolution <= 0:
+        raise ValueError("--resolution must be positive")
+    if args.target_aligned_pixels and args.resolution is None:
+        raise ValueError("--target-aligned-pixels requires --resolution")
+
     if not in_dir.is_dir():
         raise FileNotFoundError(f"Input directory not found: {in_dir}")
 
@@ -306,7 +331,14 @@ def main(argv=None):
         for src_path in rasters:
             out_path = build_output_path(out_dir, src_path)
             print(f"- {src_path.name} -> {out_path.name}")
-            reproject_file(src_path, out_path, dst_crs=args.dst_crs, resampling_alg=resampling_alg)
+            reproject_file(
+                src_path,
+                out_path,
+                dst_crs=args.dst_crs,
+                resampling_alg=resampling_alg,
+                resolution=args.resolution,
+                target_aligned_pixels=args.target_aligned_pixels,
+            )
             outputs.append(out_path)
     else:
         with ProcessPoolExecutor(max_workers=workers) as pool:
@@ -314,7 +346,15 @@ def main(argv=None):
             for src_path in rasters:
                 out_path = build_output_path(out_dir, src_path)
                 print(f"[queue] {src_path.name} -> {out_path.name}")
-                fut = pool.submit(reproject_file, src_path, out_path, args.dst_crs, resampling_alg)
+                fut = pool.submit(
+                    reproject_file,
+                    src_path,
+                    out_path,
+                    args.dst_crs,
+                    resampling_alg,
+                    args.resolution,
+                    args.target_aligned_pixels,
+                )
                 future_map[fut] = out_path
             for fut in as_completed(future_map):
                 out_path, _ = fut.result()

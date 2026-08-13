@@ -20,9 +20,13 @@ from shapely.geometry import box
 from shapely.strtree import STRtree
 
 try:
-    from .produce_ecoregion_terrain import find_shapefile
+    from .produce_ecoregion_terrain import (
+        find_shapefile,
+        infer_code_field,
+        infer_level,
+    )
 except ImportError:
-    from produce_ecoregion_terrain import find_shapefile
+    from produce_ecoregion_terrain import find_shapefile, infer_code_field, infer_level
 
 gdal.UseExceptions()
 
@@ -413,12 +417,23 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument(
         "--shapefile",
         type=Path,
-        help="ecoregion shapefile (default: downloaded CEC Level III file)",
+        help="ecoregion shapefile (default: downloaded CEC file for its level)",
+    )
+    parser.add_argument(
+        "--shapefiles-root",
+        type=Path,
+        default=DEFAULT_SHAPEFILES_ROOT,
+        help="root populated by retrieve_ecoregion_shapefiles.sh",
+    )
+    parser.add_argument(
+        "--level",
+        type=int,
+        choices=(1, 2, 3),
+        help="ecoregion level (default: inferred from the code)",
     )
     parser.add_argument(
         "--code-field",
-        default="NA_L3CODE",
-        help="shapefile field containing the ecoregion code",
+        help="shapefile code field (default: infer LEVEL<level> or legacy NA_L<level>CODE)",
     )
     parser.add_argument(
         "--manifest",
@@ -434,7 +449,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 
 
 def main(argv: list[str] | None = None) -> None:
-    """Resolve the Level III shapefile and run safe tile pruning.
+    """Resolve the appropriate ecoregion shapefile and run safe tile pruning.
 
     Parameters
     ----------
@@ -458,12 +473,14 @@ def main(argv: list[str] | None = None) -> None:
     """
     args = parse_args(argv)
     manifest = args.manifest or Path(f"prune_{args.ecoregion}.txt")
-    shapefile = args.shapefile or find_shapefile(DEFAULT_SHAPEFILES_ROOT, 3)
+    level = args.level or infer_level(args.ecoregion)
+    shapefile = args.shapefile or find_shapefile(args.shapefiles_root, level)
+    code_field = args.code_field or infer_code_field(shapefile, level)
     report = prune(
         args.tiles_root,
         args.ecoregion,
         shapefile,
-        args.code_field,
+        code_field,
         manifest,
         args.apply,
     )

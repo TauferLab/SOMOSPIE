@@ -6,8 +6,9 @@ medians. Outputs contain only the named bands used by the model:
 B02, B03, B04, B8A, B11, and B12.
 
 Band files must be single-band GeoTIFFs ending in .BXX.tif (B08A and B8A are
-both accepted). Scenes belonging to one tile are expected to use the same
-grid and projection.
+both accepted). Landsat bands B05, B06, and B07 are mapped to their
+Sentinel-named spectral equivalents B8A, B11, and B12. Scenes belonging to one
+tile must use the same pixel grid and an equivalent projection.
 """
 
 from __future__ import annotations
@@ -29,7 +30,7 @@ warnings.filterwarnings(
     message="Neither gdal.UseExceptions\\(\\) nor gdal.DontUseExceptions\\(\\).*",
     category=FutureWarning,
 )
-from osgeo import gdal, gdal_array
+from osgeo import gdal, gdal_array, osr
 
 gdal.UseExceptions()
 
@@ -50,6 +51,14 @@ BANDS_UNION = (
 )
 DEFAULT_BANDS = ("B02", "B03", "B04", "B8A", "B11", "B12")
 DEFAULT_FMASK_INVALID_BITS = (0, 1, 2, 3, 4)
+L30_TO_MODEL_BAND = {
+    "B02": "B02",
+    "B03": "B03",
+    "B04": "B04",
+    "B05": "B8A",
+    "B06": "B11",
+    "B07": "B12",
+}
 
 TILE_RE = re.compile(r"(T\d{2}[A-Z]{3})", re.IGNORECASE)
 DATE_RE = re.compile(r"\.(\d{7})")
@@ -135,6 +144,34 @@ def band_from_name(path: Path) -> str | None:
     return "B8A" if band == "B08A" else band
 
 
+def model_band_from_name(path: Path) -> str | None:
+    """Return the model channel represented by an HLS source-band file.
+
+    HLS uses sensor-native band identifiers even though its reflectance is
+    harmonized. For Landsat L30, near-infrared and shortwave-infrared bands
+    B05/B06/B07 therefore correspond to the model's Sentinel-style channel
+    names B8A/B11/B12. Sentinel S30 and sensor-neutral filenames retain their
+    canonical names.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Candidate HLS single-band GeoTIFF.
+
+    Returns
+    -------
+    str or None
+        Model channel name, or ``None`` when the filename is not a recognized
+        spectral band or an L30 band is not one of the six model inputs.
+    """
+    source_band = band_from_name(path)
+    if source_band is None:
+        return None
+    if ".L30." in path.name.upper():
+        return L30_TO_MODEL_BAND.get(source_band)
+    return source_band
+
+
 def collect_files(
     root: Path,
     start: dt.date | None,
@@ -172,7 +209,7 @@ def collect_files(
     )
 
     for path in sorted(candidates):
-        band = band_from_name(path)
+        band = model_band_from_name(path)
         tile_match = TILE_RE.search(path.name)
         if band not in requested or tile_match is None:
             continue
@@ -352,7 +389,7 @@ def _same_grid(
     geotransform: tuple[float, ...],
     projection: str,
 ) -> bool:
-    """Check whether a scene exactly matches the reference tile grid.
+    """Check whether a scene matches the reference pixel grid and CRS.
 
     Parameters
     ----------
@@ -368,14 +405,59 @@ def _same_grid(
     Returns
     -------
     bool
-        True only when size, transform, and projection all match exactly.
+        True when dimensions and transforms match and both CRS definitions are
+        geospatially equivalent. Equivalent WKT spellings are accepted.
     """
-    return (
-        dataset.RasterXSize == width
-        and dataset.RasterYSize == height
-        and dataset.GetGeoTransform() == geotransform
-        and dataset.GetProjection() == projection
+    if (
+        dataset.RasterXSize != width
+        or dataset.RasterYSize != height
+        or not np.allclose(
+            dataset.GetGeoTransform(), geotransform, rtol=0.0, atol=1e-6
+        )
+    ):
+        return False
+
+    candidate_projection = dataset.GetProjection()
+    if not candidate_projection or not projection:
+        return False
+    candidate_crs = osr.SpatialReference()
+    reference_crs = osr.SpatialReference()
+    try:
+        candidate_crs.ImportFromWkt(candidate_projection)
+        reference_crs.ImportFromWkt(projection)
+    except RuntimeError:
+        return False
+    if candidate_crs.IsSame(reference_crs):
+        return True
+
+    # HLS L30 v2 labels its WGS84 ellipsoid as an unknown datum, while S30
+    # identifies EPSG:4326 explicitly. GDAL therefore reports different CRS
+    # objects even though the projected coordinate systems are numerically
+    # identical. Compare the defining projection values for that known case.
+    candidate_method = candidate_crs.GetAttrValue("PROJECTION")
+    reference_method = reference_crs.GetAttrValue("PROJECTION")
+    if not candidate_method or candidate_method != reference_method:
+        return False
+    parameters = (
+        osr.SRS_PP_LATITUDE_OF_ORIGIN,
+        osr.SRS_PP_CENTRAL_MERIDIAN,
+        osr.SRS_PP_SCALE_FACTOR,
+        osr.SRS_PP_FALSE_EASTING,
+        osr.SRS_PP_FALSE_NORTHING,
     )
+    candidate_values = [
+        candidate_crs.GetSemiMajor(),
+        candidate_crs.GetInvFlattening(),
+        candidate_crs.GetLinearUnits(),
+        *(candidate_crs.GetProjParm(name) for name in parameters),
+    ]
+    reference_values = [
+        reference_crs.GetSemiMajor(),
+        reference_crs.GetInvFlattening(),
+        reference_crs.GetLinearUnits(),
+        *(reference_crs.GetProjParm(name) for name in parameters),
+    ]
+    return bool(np.allclose(candidate_values, reference_values, rtol=0.0, atol=1e-9))
 
 
 def _read_window(

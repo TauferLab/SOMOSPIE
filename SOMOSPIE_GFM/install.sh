@@ -23,7 +23,7 @@ Create a virtual environment and install SOMOSPIE-GFM in editable mode.
 Options:
   --venv PATH             Environment directory (default: ./.venv)
   --cpu                   Install CPU-only PyTorch wheels
-  --cuda                  Install CUDA 12.8 PyTorch wheels
+  --cuda                  Install CUDA 12.1 PyTorch wheels
   --skip-system-packages  Do not install apt packages; require GDAL beforehand
   -h, --help              Show this help
 
@@ -127,6 +127,7 @@ VENV_PYTHON="${VENV_DIR}/bin/python"
 GDAL_VERSION="$(gdal-config --version)"
 "${VENV_PYTHON}" -m pip install \
     --no-cache-dir \
+    --no-build-isolation \
     --force-reinstall \
     "gdal[numpy]==${GDAL_VERSION}"
 
@@ -139,15 +140,19 @@ if [[ "${ACCELERATOR}" == "auto" ]]; then
 fi
 
 if [[ "${ACCELERATOR}" == "cuda" ]]; then
-    TORCH_INDEX_URL="https://download.pytorch.org/whl/cu128"
+    TORCH_INDEX_ARGS=(--extra-index-url "https://download.pytorch.org/whl/cu121")
+    TORCH_VERSION="2.5.1+cu121"
+    TORCHVISION_VERSION="0.20.1+cu121"
 else
-    TORCH_INDEX_URL="https://download.pytorch.org/whl/cpu"
+    TORCH_INDEX_ARGS=(--extra-index-url "https://download.pytorch.org/whl/cpu")
+    TORCH_VERSION="2.5.1+cpu"
+    TORCHVISION_VERSION="0.20.1+cpu"
 fi
 
 "${VENV_PYTHON}" -m pip install \
-    --index-url "${TORCH_INDEX_URL}" \
-    "torch==2.9.1" \
-    "torchvision==0.24.1"
+    "${TORCH_INDEX_ARGS[@]}" \
+    "torch==${TORCH_VERSION}" \
+    "torchvision==${TORCHVISION_VERSION}"
 "${VENV_PYTHON}" -m pip install --editable "${SCRIPT_DIR}"
 
 "${VENV_PYTHON}" - <<'PY'

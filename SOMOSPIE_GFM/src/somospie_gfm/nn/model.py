@@ -71,6 +71,12 @@ class ModelConfig:
     def __post_init__(self) -> None:
         """Validate settings before any large backbone is allocated.
 
+        Returns
+        -------
+        None
+            Validation mutates no fields; successful return confirms that the
+            configuration is internally consistent.
+
         Raises
         ------
         ValueError
@@ -98,7 +104,13 @@ class ModelConfig:
             raise ValueError("drop_path_rate must be in [0, 1)")
 
     def to_dict(self) -> dict[str, Any]:
-        """Return a JSON- and torch-checkpoint-friendly configuration mapping."""
+        """Return a JSON- and torch-checkpoint-friendly configuration mapping.
+
+        Returns
+        -------
+        dict
+            All architecture fields, with ``channel_names`` converted to a list.
+        """
         values = asdict(self)
         values["channel_names"] = list(self.channel_names)
         return values
@@ -106,6 +118,16 @@ class ModelConfig:
     @classmethod
     def from_dict(cls, values: dict[str, Any]) -> "ModelConfig":
         """Rebuild a validated configuration from checkpoint metadata.
+
+        Parameters
+        ----------
+        values : dict
+            Serialized architecture mapping produced by :meth:`to_dict`.
+
+        Returns
+        -------
+        ModelConfig
+            Immutable, validated architecture settings.
 
         Raises
         ------
@@ -149,6 +171,31 @@ class PrithviSoilMoisture(nn.Module):
         backbone_checkpoint: str | None = None,
         freeze_backbone: bool = False,
     ) -> None:
+        """Build the Prithvi backbone and configured dense decoder.
+
+        Parameters
+        ----------
+        config : ModelConfig
+            Complete channel and architecture contract.
+        pretrained : bool, optional
+            Request TerraTorch pretrained backbone weights.
+        backbone_checkpoint : str or None, optional
+            Local TerraTorch checkpoint used when pretrained weights are enabled.
+        freeze_backbone : bool, optional
+            Disable backbone gradients after construction.
+
+        Returns
+        -------
+        None
+            Backbone, decoder, and feature metadata are initialized in place.
+
+        Raises
+        ------
+        ModuleNotFoundError
+            If TerraTorch is not installed.
+        RuntimeError, ValueError, AttributeError
+            If the requested backbone cannot be built or lacks required metadata.
+        """
         super().__init__()
         try:
             from terratorch.registry import BACKBONE_REGISTRY
@@ -187,21 +234,52 @@ class PrithviSoilMoisture(nn.Module):
             self.freeze_backbone()
 
     def freeze_backbone(self) -> None:
-        """Disable gradients for every Prithvi parameter in place."""
+        """Disable gradients for every Prithvi backbone parameter in place.
+
+        Returns
+        -------
+        None
+            The backbone parameters' ``requires_grad`` flags are changed as a
+            side effect.
+        """
         for parameter in self.backbone.parameters():
             parameter.requires_grad_(False)
 
     def unfreeze_backbone(self) -> None:
-        """Enable gradients for every Prithvi parameter in place."""
+        """Enable gradients for every Prithvi backbone parameter in place.
+
+        Returns
+        -------
+        None
+            The backbone parameters' ``requires_grad`` flags are changed as a
+            side effect.
+        """
         for parameter in self.backbone.parameters():
             parameter.requires_grad_(True)
 
     def decoder_parameters(self) -> Iterator[nn.Parameter]:
-        """Return the decoder parameter iterator for optimizer grouping."""
+        """Return the decoder parameter iterator for optimizer grouping.
+
+        Returns
+        -------
+        iterator of torch.nn.Parameter
+            Parameters belonging only to the dense decoder.
+        """
         return self.decoder.parameters()
 
     def _feature_maps(self, inputs: torch.Tensor) -> list[torch.Tensor]:
         """Run Prithvi and reshape its token sequences to image grids.
+
+        Parameters
+        ----------
+        inputs : torch.Tensor
+            Normalized input batch in ``[B, C, H, W]`` or
+            ``[B, C, T, H, W]`` form.
+
+        Returns
+        -------
+        list of torch.Tensor
+            Spatial feature maps produced by the configured backbone layers.
 
         Raises
         ------
@@ -231,10 +309,22 @@ class PrithviSoilMoisture(nn.Module):
     def forward(self, inputs: torch.Tensor) -> torch.Tensor:
         """Predict dense soil moisture for a normalized tile batch.
 
+        Parameters
+        ----------
+        inputs : torch.Tensor
+            Normalized ``[B, C, H, W]`` or ``[B, C, T, H, W]`` inputs.
+
         Returns
         -------
         torch.Tensor
             ``[batch, output_height, output_width]`` predictions.
+
+        Raises
+        ------
+        ValueError
+            If input shape/channels or backbone feature output are invalid.
+        RuntimeError
+            If PyTorch or the decoder cannot process the resulting feature maps.
         """
         features = self._feature_maps(inputs)
         decoder_input: torch.Tensor | list[torch.Tensor]

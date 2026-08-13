@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import random
 import sys
@@ -84,6 +85,24 @@ def make_loader(
     """Build a GDAL-safe PyTorch loader for a prepared-tile dataset.
 
     Spawned workers avoid inheriting GDAL locks and CUDA state from the parent.
+
+    Parameters
+    ----------
+    dataset : PreparedTileDataset
+        Prepared records exposed to the loader.
+    batch_size : int
+        Positive number of records per mini-batch.
+    workers : int
+        Non-negative spawned worker count.
+    shuffle : bool
+        Randomize record order for training when true.
+    device : torch.device
+        Target device; CUDA enables pinned host memory.
+
+    Returns
+    -------
+    torch.utils.data.DataLoader
+        Configured loader safe for GDAL-backed datasets.
 
     Raises
     ------
@@ -250,6 +269,20 @@ def build_optimizer(
 ) -> AdamW:
     """Create AdamW groups with separate decoder and backbone rates.
 
+    Parameters
+    ----------
+    model : PrithviSoilMoisture
+        Model whose trainable parameters are grouped.
+    head_lr, backbone_lr : float
+        Positive learning rates for decoder and unfrozen backbone parameters.
+    weight_decay : float
+        Non-negative AdamW decay coefficient.
+
+    Returns
+    -------
+    torch.optim.AdamW
+        Optimizer containing the decoder and any trainable backbone parameters.
+
     Raises
     ------
     ValueError
@@ -277,6 +310,30 @@ def save_checkpoint(
     arguments: argparse.Namespace,
 ) -> None:
     """Atomically write a restartable, inference-ready checkpoint.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Final checkpoint destination.
+    model : PrithviSoilMoisture
+        Model configuration and learned state to serialize.
+    optimizer : torch.optim.AdamW
+        Optimizer state needed for a future restart.
+    epoch : int
+        Completed epoch number.
+    metric : float
+        Selection MSE associated with this checkpoint.
+    stats_artifact : dict
+        Normalization artifact embedded for inference reproducibility.
+    history : list of dict
+        Epoch metrics through ``epoch``.
+    arguments : argparse.Namespace
+        Training CLI settings recorded as provenance.
+
+    Returns
+    -------
+    None
+        A checkpoint is written and atomically published.
 
     Raises
     ------
@@ -309,7 +366,23 @@ def save_checkpoint(
 
 
 def _splits(value: str) -> tuple[str, ...]:
-    """Parse a comma-separated, non-empty split option."""
+    """Parse a comma-separated, non-empty training split option.
+
+    Parameters
+    ----------
+    value : str
+        Raw command-line value such as ``"train,validation"``.
+
+    Returns
+    -------
+    tuple of str
+        Trimmed, non-empty split labels in their supplied order.
+
+    Raises
+    ------
+    argparse.ArgumentTypeError
+        If the value contains no usable split label.
+    """
     result = tuple(item.strip() for item in value.split(",") if item.strip())
     if not result:
         raise argparse.ArgumentTypeError("split list must not be empty")
@@ -318,6 +391,16 @@ def _splits(value: str) -> tuple[str, ...]:
 
 def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     """Parse and validate training command-line arguments.
+
+    Parameters
+    ----------
+    argv : sequence of str or None, optional
+        Explicit arguments; ``None`` reads process arguments.
+
+    Returns
+    -------
+    argparse.Namespace
+        Validated data, architecture, optimization, and output settings.
 
     Raises
     ------

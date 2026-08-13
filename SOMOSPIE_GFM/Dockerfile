@@ -1,9 +1,9 @@
-ARG CUDA_IMAGE=nvidia/cuda:12.8.1-cudnn-runtime-ubuntu24.04
+ARG CUDA_IMAGE=nvidia/cuda:12.1.1-cudnn8-runtime-ubuntu22.04
 FROM ${CUDA_IMAGE}
 
 ARG DEBIAN_FRONTEND=noninteractive
-ARG PYTORCH_VERSION=2.9.1
-ARG TORCHVISION_VERSION=0.24.1
+ARG PYTORCH_VERSION=2.5.1
+ARG TORCHVISION_VERSION=0.20.1
 
 ENV VIRTUAL_ENV=/opt/somospie-gfm-venv \
     PATH=/opt/somospie-gfm-venv/bin:${PATH} \
@@ -11,9 +11,9 @@ ENV VIRTUAL_ENV=/opt/somospie-gfm-venv \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_NO_CACHE_DIR=1
 
-# Ubuntu 24.04 provides GDAL 3.8.4, the same platform/version combination used
-# by GEOtiled. Build tools are retained because some TerraTorch dependencies do
-# not publish wheels for every supported architecture.
+# Native GDAL comes from the selected Ubuntu base. Build tools are retained
+# because the matching Python bindings and some TerraTorch dependencies do not
+# publish wheels for every supported architecture.
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
         build-essential \
@@ -36,12 +36,12 @@ RUN apt-get update \
 RUN python -m pip install --upgrade pip setuptools wheel \
     && python -m pip install "numpy>=2.2,<3" \
     && GDAL_VERSION="$(gdal-config --version)" \
-    && python -m pip install --force-reinstall "gdal[numpy]==${GDAL_VERSION}"
+    && python -m pip install --no-build-isolation --force-reinstall "gdal[numpy]==${GDAL_VERSION}"
 
-# The CUDA wheel index keeps the Python framework aligned with the CUDA 12.8
+# The CUDA wheel index keeps the Python framework aligned with the CUDA 12.1
 # runtime in the base image. Project metadata supplies the remaining packages.
 RUN python -m pip install \
-        --index-url https://download.pytorch.org/whl/cu128 \
+        --extra-index-url https://download.pytorch.org/whl/cu121 \
         "torch==${PYTORCH_VERSION}" \
         "torchvision==${TORCHVISION_VERSION}"
 

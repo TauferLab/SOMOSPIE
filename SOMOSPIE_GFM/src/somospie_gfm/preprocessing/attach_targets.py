@@ -110,7 +110,16 @@ def _month_candidates(month: str, fallback: str) -> list[str]:
         ]
     else:
         numeric = lower[1:] if lower.startswith("x") else lower
-        names = [f"X{numeric}", f"x{numeric}"] if numeric.isdigit() else [value]
+        if numeric.isdigit():
+            unpadded = str(int(numeric))
+            names = [
+                f"X{unpadded}",
+                f"x{unpadded}",
+                f"X{numeric}",
+                f"x{numeric}",
+            ]
+        else:
+            names = [value]
     return list(dict.fromkeys([*names, fallback]))
 
 

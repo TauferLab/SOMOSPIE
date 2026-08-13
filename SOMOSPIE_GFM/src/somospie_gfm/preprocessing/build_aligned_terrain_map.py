@@ -237,7 +237,7 @@ def _matches_grid(
     height: int,
     bands: int,
 ) -> bool:
-    """Check whether an existing aligned mosaic exactly matches a target grid.
+    """Check whether an existing aligned mosaic matches a target grid.
 
     Parameters
     ----------
@@ -253,7 +253,8 @@ def _matches_grid(
     Returns
     -------
     bool
-        True only when every reuse-critical metadata field matches exactly.
+        True when reuse-critical metadata matches, allowing only serialization
+        roundoff in affine-transform coefficients.
 
     Notes
     -----
@@ -263,11 +264,14 @@ def _matches_grid(
     if dataset is None:
         return False
     try:
+        tolerance = max(abs(transform[1]), abs(transform[5])) * 1e-9
         return (
             dataset.RasterXSize == width
             and dataset.RasterYSize == height
             and dataset.RasterCount == bands
-            and tuple(dataset.GetGeoTransform()) == transform
+            and np.allclose(
+                dataset.GetGeoTransform(), transform, rtol=0.0, atol=tolerance
+            )
             and dataset.GetProjection() == projection
         )
     finally:

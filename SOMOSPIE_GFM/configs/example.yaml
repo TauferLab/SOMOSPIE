@@ -4,13 +4,13 @@
 
 # One or more ecoregions whose prepared tiles provide training supervision.
 train_ecoregions:
-  - "11.1.1"
+  - "11.1"
 
 # Ecoregion on which the trained model produces dense soil-moisture maps.
 infer_ecoregion: "11.1.1"
 
 # Filesystem-safe name used to group this run's artifacts and logs.
-results_slug: "11.1.1"
+results_slug: "l2_11.1_to_l3_11.1.1"
 
 
 # Observation period
@@ -78,6 +78,17 @@ num_workers: 8
 
 # Enable CUDA mixed precision. This is ignored when training on CPU.
 amp: true
+
+# Inference and final rendering
+# -----------------------------
+
+# Fifty-percent overlap plus Hann blending removes prediction tile seams.
+# Keep this below tile_size; tile_size / 2 is the recommended value.
+inference_stride: 112
+
+# Cosmetic Gaussian smoothing for the PNG only. Zero leaves it disabled and
+# never changes the final, ecoregion-cropped GeoTIFF.
+png_smooth_sigma: 0.0
 
 # Storage
 # -------

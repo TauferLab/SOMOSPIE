@@ -146,6 +146,56 @@ def find_shapefile(root: Path, level: int) -> Path:
     return matches[0]
 
 
+def infer_code_field(shapefile: Path, level: int) -> str:
+    """Find the ecoregion-code field used by a downloaded shapefile.
+
+    Current CEC/EPA files use ``LEVEL1`` through ``LEVEL3``. Older releases
+    used ``NA_L1CODE`` through ``NA_L3CODE``; both schemas are accepted
+    case-insensitively.
+
+    Parameters
+    ----------
+    shapefile : pathlib.Path
+        Ecoregion vector dataset whose schema is inspected.
+    level : int
+        Ecoregion hierarchy level from 1 through 3.
+
+    Returns
+    -------
+    str
+        Actual field name present in the vector layer.
+
+    Raises
+    ------
+    RuntimeError
+        If OGR cannot open the dataset or its first layer.
+    ValueError
+        If neither the current nor legacy field exists.
+    """
+    dataset = ogr.Open(str(shapefile))
+    if dataset is None:
+        raise RuntimeError(f"could not open shapefile: {shapefile}")
+    try:
+        layer = dataset.GetLayer(0)
+        if layer is None:
+            raise RuntimeError(f"shapefile has no layers: {shapefile}")
+        definition = layer.GetLayerDefn()
+        fields = [
+            definition.GetFieldDefn(index).GetName()
+            for index in range(definition.GetFieldCount())
+        ]
+        by_uppercase = {field.upper(): field for field in fields}
+        for candidate in (f"LEVEL{level}", f"NA_L{level}CODE"):
+            if candidate in by_uppercase:
+                return by_uppercase[candidate]
+        raise ValueError(
+            f"could not infer the level {level} code field in {shapefile}; "
+            f"expected LEVEL{level} or NA_L{level}CODE, available fields: {fields}"
+        )
+    finally:
+        dataset = None
+
+
 def _attribute_filter(
     field_name: str,
     field_type: int,
@@ -703,7 +753,7 @@ def parse_args(argv: Sequence[str] | None = None) -> argparse.Namespace:
     )
     parser.add_argument(
         "--code-field",
-        help="shapefile code field (default: NA_L<level>CODE)",
+        help="shapefile code field (default: infer LEVEL<level> or legacy NA_L<level>CODE)",
     )
     parser.add_argument(
         "--nodata",
@@ -748,7 +798,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     args = parse_args(argv)
     level = args.level or infer_level(args.ecoregion)
     shapefile = args.shapefile or find_shapefile(args.shapefiles_root, level)
-    code_field = args.code_field or f"NA_L{level}CODE"
+    code_field = args.code_field or infer_code_field(shapefile, level)
     selection = load_region(shapefile, code_field, args.ecoregion)
     report = produce(
         args.input_dir,

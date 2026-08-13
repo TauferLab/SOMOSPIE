@@ -80,7 +80,13 @@ class NormalizationStats:
 
     @property
     def terrain_channels(self) -> int:
-        """Return the number of aligned-terrain channels expected per tile."""
+        """Return the number of aligned-terrain channels expected per tile.
+
+        Returns
+        -------
+        int
+            Total channels minus the leading HLS channels.
+        """
         return len(self.channel_names) - len(self.hls_bands)
 
 
@@ -251,6 +257,17 @@ def load_stats(path: Path) -> NormalizationStats:
 def stats_from_checkpoint(artifact: dict[str, Any]) -> NormalizationStats:
     """Validate an embedded statistics artifact without temporary files.
 
+    Parameters
+    ----------
+    artifact : dict
+        Checkpoint ``normalization_stats`` mapping using the same schema as
+        :func:`load_stats`.
+
+    Returns
+    -------
+    NormalizationStats
+        Validated channel order and float32 normalization moments.
+
     Raises
     ------
     KeyError, TypeError, ValueError
@@ -328,7 +345,19 @@ def open_aligned_terrain(path: Path) -> AlignedTerrain:
 
 
 def _region_key(value: str) -> str:
-    """Normalize region spelling for terrain-map matching."""
+    """Normalize a region label for case-insensitive terrain-map matching.
+
+    Parameters
+    ----------
+    value : str
+        Ecoregion label from a manifest or configuration mapping.
+
+    Returns
+    -------
+    str
+        Lowercase label with surrounding whitespace removed and spaces
+        replaced by underscores.
+    """
     return value.strip().lower().replace(" ", "_")
 
 
@@ -360,6 +389,29 @@ class TerrainResolver:
         shared: Path | None = None,
         mapping: dict[str, Path] | None = None,
     ) -> None:
+        """Open and validate every configured aligned-terrain source.
+
+        Parameters
+        ----------
+        expected_channels : int
+            Number of terrain channels required by model statistics.
+        shared : pathlib.Path or None, optional
+            Single aligned terrain raster used as a fallback.
+        mapping : dict of str to pathlib.Path or None, optional
+            Region labels mapped to aligned terrain rasters.
+
+        Returns
+        -------
+        None
+            Resolver state and raster metadata are initialized in place.
+
+        Raises
+        ------
+        ValueError
+            If required terrain is absent or a raster has the wrong band count.
+        FileNotFoundError, RuntimeError
+            If a configured raster is missing or cannot be opened.
+        """
         self.expected_channels = expected_channels
         self.shared = open_aligned_terrain(shared) if shared is not None else None
         self.mapping = {
@@ -383,6 +435,17 @@ class TerrainResolver:
 
     def resolve(self, record: TileRecord) -> AlignedTerrain | None:
         """Return aligned terrain for one tile or ``None`` for HLS-only data.
+
+        Parameters
+        ----------
+        record : TileRecord
+            Manifest record whose region and path select a terrain source.
+
+        Returns
+        -------
+        AlignedTerrain or None
+            Matching aligned raster metadata, or ``None`` when the statistics
+            contain no terrain channels.
 
         Raises
         ------
@@ -410,6 +473,16 @@ class TerrainResolver:
 def load_terrain_map(path: Path | None) -> dict[str, Path] | None:
     """Load an optional JSON region-to-aligned-raster mapping.
 
+    Parameters
+    ----------
+    path : pathlib.Path or None
+        JSON mapping path; ``None`` disables region-specific terrain.
+
+    Returns
+    -------
+    dict of str to pathlib.Path or None
+        Parsed region mapping, or ``None`` when no path was supplied.
+
     Raises
     ------
     FileNotFoundError
@@ -433,7 +506,28 @@ def load_terrain_map(path: Path | None) -> dict[str, Path] | None:
 
 
 def _band_indices(path: Path, bands: Sequence[str]) -> list[int]:
-    """Resolve HLS band indices from one prepared tile header."""
+    """Resolve requested HLS channels from one prepared tile header.
+
+    Parameters
+    ----------
+    path : pathlib.Path
+        Prepared multi-band HLS tile to inspect.
+    bands : sequence of str
+        Canonical HLS band names in the order required by the model.
+
+    Returns
+    -------
+    list of int
+        One-based GDAL band indices corresponding to ``bands``.
+
+    Raises
+    ------
+    RuntimeError
+        If GDAL cannot open the prepared tile.
+    ValueError
+        If the requested names cannot be matched unambiguously to the raster
+        band descriptions.
+    """
     dataset = gdal.Open(str(path))
     if dataset is None:
         raise RuntimeError(f"could not open prepared tile: {path}")
@@ -482,6 +576,32 @@ class PreparedTileDataset(Dataset):
         terrain: TerrainResolver,
         tile_size: int | None = None,
     ) -> None:
+        """Validate records and cache their normalization/read contract.
+
+        Parameters
+        ----------
+        records : sequence of TileRecord
+            Manifest records exposed by this dataset.
+        stats : NormalizationStats
+            Required channel order, means, and standard deviations.
+        terrain : TerrainResolver
+            Source of optional aligned terrain windows.
+        tile_size : int or None, optional
+            Required square raster size, inferred from the first record when
+            omitted.
+
+        Returns
+        -------
+        None
+            Dataset metadata and band indices are initialized in place.
+
+        Raises
+        ------
+        ValueError
+            If records are empty, dimensions are invalid, or sizes differ.
+        RuntimeError
+            If the first prepared raster cannot be opened.
+        """
         if not records:
             raise ValueError("PreparedTileDataset requires at least one record")
         self.records = list(records)
@@ -506,11 +626,28 @@ class PreparedTileDataset(Dataset):
         self.std = stats.std[:, None, None]
 
     def __len__(self) -> int:
-        """Return the number of selected manifest records."""
+        """Return the number of selected manifest records.
+
+        Returns
+        -------
+        int
+            Dataset length used by PyTorch samplers and loaders.
+        """
         return len(self.records)
 
     def __getitem__(self, index: int) -> tuple[torch.Tensor, torch.Tensor, int]:
         """Load, normalize, and tensorize one record.
+
+        Parameters
+        ----------
+        index : int
+            Zero-based record index.
+
+        Returns
+        -------
+        tuple of torch.Tensor, torch.Tensor, int
+            Normalized ``[C, 1, H, W]`` input, scalar target (NaN when
+            unlabelled), and the original index.
 
         Raises
         ------

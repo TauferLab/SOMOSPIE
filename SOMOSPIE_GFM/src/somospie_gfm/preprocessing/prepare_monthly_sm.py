@@ -321,7 +321,7 @@ def build_monthly_df(year_dir: Path, year: int, var: str) -> pd.DataFrame:
     Returns
     -------
     pandas.DataFrame
-        Columns ``x``, ``y``, ``X1`` … ``X12`` — longitude, latitude, and one
+        Columns ``x``, ``y``, ``X1`` … ``X12`` contain longitude, latitude, and one
         mean per month. Downstream code selects the target month by name.
 
     Raises

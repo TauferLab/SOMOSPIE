@@ -320,7 +320,7 @@ postprocess_predictions() {
     "${PYTHON}" -m somospie_gfm.postprocessing.finalize_predictions --input "${RAW_PREDICTION}" --output "${FINAL_PREDICTION}" --ecoregion "${INFER_REGION}" --shapefiles-root "${SHAPEFILES}" "${force[@]}"
 }
 visualize_predictions() {
-    "${PYTHON}" -m somospie_gfm.visualize.render_prediction --input "${FINAL_PREDICTION}" --output "${FINAL_PNG}" --title "Predicted soil moisture — ${INFER_REGION} (${YEAR}-${MONTH})" --smooth-sigma "${PNG_SMOOTH_SIGMA}"
+    "${PYTHON}" -m somospie_gfm.visualize.render_prediction --input "${FINAL_PREDICTION}" --output "${FINAL_PNG}" --title "Predicted soil moisture: ${INFER_REGION} (${YEAR}-${MONTH})" --smooth-sigma "${PNG_SMOOTH_SIGMA}"
 }
 run_prepare() {
     preflight_prepare

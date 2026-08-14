@@ -166,6 +166,38 @@ SOMOSPIE_SKIP_ACQUISITION=1 \
 Set `SOMOSPIE_PYTHON=/path/to/python` to override the interpreter. Otherwise,
 the runner prefers `.venv/bin/python` and falls back to `python3`.
 
+## Slurm
+
+The Slurm runner requests one A100 GPU, 16 CPU cores, and 192 GB of memory on
+the `bebq-delta-gpu` account. Install the environment on a login node first,
+then submit from the `SOMOSPIE_GFM` checkout:
+
+```bash
+./install.sh --cuda --skip-system-packages
+sbatch workflows/slurm/sm_workflow.sbatch configs/config.yaml all
+```
+
+It accepts the same modes and optional `--force` flag as the local runner:
+
+```bash
+sbatch workflows/slurm/sm_workflow.sbatch configs/config.yaml infer --force
+sbatch workflows/slurm/sm_workflow.sbatch train
+```
+
+The batch wrapper loads the cluster's `python` module by default, prefers the
+checkout's `.venv`, prints job and GPU metadata, and launches the canonical
+local workflow through `srun`. Slurm standard output and error are written as
+`slurm-<job-name>-<job-id>.out` and `.err` in the submission directory; the
+workflow's detailed timestamped log is still written below the configured
+`workdir`.
+
+For a checkout outside the submission directory, export
+`SOMOSPIE_GFM_ROOT=/absolute/path/to/SOMOSPIE_GFM` before `sbatch`. Set
+`SOMOSPIE_PYTHON` for an external environment, `SOMOSPIE_MODULES` for a
+site-specific space-separated module list, or `SOMOSPIE_SKIP_MODULES=1` to
+retain the submitted module environment. Earthdata acquisition also requires
+the login node's protected `~/.netrc` to be visible on compute nodes.
+
 ## Data and output layout
 
 The workflow creates this storage contract:

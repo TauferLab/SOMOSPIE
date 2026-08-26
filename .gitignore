@@ -1,4 +1,21 @@
+# Operating-system and editor files
 *.DS_Store
+*.swp
+
+# Python environments, bytecode, build products, and tool caches
+__pycache__/
+*.py[cod]
+.venv/
+*.egg-info/
+build/
+dist/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Generated reports, logs, and tabular artifacts
 *.pkl
 *.pdf
 *.doc
@@ -6,10 +23,11 @@
 *.ppt
 *.pptx
 *.log
+slurm-*.out
+slurm-*.err
 *.csv
 *.rds
 *.png
-*.tif*  
 *.nc
 *.txt
 *.tar
@@ -20,12 +38,17 @@
 *.params
 *.Rhistory
 .ipynb_checkpoints
-*.swp
+
+# Generated geospatial datasets and sidecars
 *.dbf
 *.prj
 *.sbn
 *.sbx
 *.shp
+*.cpg
+*.qix
+*.lyrx
+*.qlr
 *.vrt
 *.xml
 *.shx
@@ -33,7 +56,23 @@
 *.sdat
 *.sgrd
 *.wkt
-__pycache__
+*.tif
+*.tiff
+*.aux.xml
+*.ovr
+
+# Model artifacts
+*.pt
+*.pth
+
+# SOMOSPIE-GFM machine-local configuration and downloaded resources
+SOMOSPIE_GFM/configs/config.yaml
+SOMOSPIE_GFM/resources/shapefiles/
+!SOMOSPIE_GFM/resources/*.csv
+!SOMOSPIE_GFM/resources/codes.txt
+SOMOSPIE_GFM/workdir/
+SOMOSPIE_GFM/workflow-logs/
+
+# Legacy SOMOSPIE generated data
 SOMOSPIE/out/*
 SOMOSPIE/data/*
-

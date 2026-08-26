@@ -1,0 +1,112 @@
+# Train on EPA Level II ecoregion 11.1 and predict EPA Level III ecoregion
+# 11.1.1. Ecoregion levels are derived from each code: level = dots + 1.
+# Consequently, no separate level setting is needed or allowed.
+
+# One or more ecoregions whose prepared tiles provide training supervision.
+train_ecoregions:
+  - "11.1"
+
+# Ecoregion on which the trained model produces dense soil-moisture maps.
+infer_ecoregion: "11.1.1"
+
+# Filesystem-safe name used to group this run's artifacts and logs.
+results_slug: "l2_11.1_to_l3_11.1.1"
+
+
+# Observation period
+# ------------------
+
+# Calendar year and two-digit month used for HLS and ESA-CCI acquisition.
+year: 2019
+month: "06"
+
+# Maximum HLS scene cloud cover accepted during acquisition, as a percentage.
+hls_cloud_coverage: 20
+
+# HLS channels are intentionally not configurable. Every stage uses the six
+# Prithvi bands B02, B03, B04, B8A, B11, and B12 in that exact order.
+
+# Model architecture
+# ------------------
+
+# TerraTorch registry name for the pretrained Prithvi encoder.
+backbone_name: "prithvi_eo_v2_600"
+
+# Prepared input tiles are 224 px square. Prithvi-600 uses 14 px patches, so
+# this produces a 16 x 16 patch-token grid.
+tile_size: 224
+patch_size: 14
+
+# Dense convolutional decoder that expands patch features to pixel predictions.
+decoder_type: "conv_upsample_4stage"
+decoder_channels: 128
+
+# Regularization probabilities in the decoder and Prithvi backbone.
+decoder_dropout: 0.10
+backbone_drop_path_rate: 0.10
+
+# Dense pixel output, tile-mean ESA-CCI supervision, and all available terrain
+# parameters are fixed pipeline behavior and therefore have no config switches.
+
+
+# Optimization
+# ------------
+
+# Number of full passes over the training manifest and tiles per mini-batch.
+epochs: 50
+batch_size: 8
+
+# Keep Prithvi frozen for this many warm-up epochs, then fine-tune it. Set to 0
+# to train the backbone from the first epoch.
+unfreeze_after: 15
+
+# Separate learning rates let the new decoder and pretrained backbone adapt at
+# different speeds.
+lr_head: 1.0e-5
+lr_backbone: 3.0e-5
+weight_decay: 0.01
+
+# Edge-guided total-variation regularization. Zero disables the extra loss.
+tv_loss_weight: 0.0
+
+# Accumulate this many mini-batches before updating weights. The effective
+# batch size is batch_size multiplied by grad_accum_steps.
+grad_accum_steps: 1
+
+# Number of spawned data-loader workers. Spawn avoids inherited GDAL locks.
+num_workers: 8
+
+# Enable CUDA mixed precision. This is ignored when training on CPU.
+amp: true
+
+# Inference and final rendering
+# -----------------------------
+
+# Fifty-percent overlap plus Hann blending removes prediction tile seams.
+# Keep this below tile_size; tile_size / 2 is the recommended value.
+inference_stride: 112
+
+# Cosmetic Gaussian smoothing for the PNG only. Zero leaves it disabled and
+# never changes the final, ecoregion-cropped GeoTIFF.
+png_smooth_sigma: 0.0
+
+# Storage
+# -------
+
+# Single root for every input, intermediate, and result. The workflow creates
+# the layout documented in workflows/local/test.sh:
+#
+#   workdir/
+#   ├── raw/{esa_cci,hls,terrain}/
+#   ├── intermediate/
+#   ├── prepared/
+#   ├── models/
+#   ├── predictions/
+#   ├── evaluation/
+#   ├── logs/
+#   └── run-metadata/
+workdir: "/work/hdd/bebq/jweeks2/prithvi_workflow"
+
+# CPU workers used by memory-conscious raster reprojection. This is separate
+# from num_workers because preprocessing and model training run independently.
+reproject_workers: 8
